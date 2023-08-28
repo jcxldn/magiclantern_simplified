@@ -5,10 +5,12 @@ PLATFORM_MAP = \
     5D4.133 \
     6D.116 \
     6D2.105 \
+    7D2.112 \
     50D.109 \
     60D.111 \
-    77D.102 \
-    80D.102 \
+    77D.110 \
+    70D.112 \
+    80D.103 \
     200D.101 \
     500D.111 \
     550D.109 \
@@ -16,7 +18,6 @@ PLATFORM_MAP = \
     650D.104 \
     700D.115 \
     750D.110 \
-    760D.100 \
     850D.100 \
     100D.101 \
     1100D.105 \
@@ -24,19 +25,18 @@ PLATFORM_MAP = \
     M50.110 \
     R.180 \
     RP.160 \
+    R5.152 \
+    SX740.102 \
+    SX70.111 \
+    5DSR.112 \
+    7D.203 \
 
-# SJE lots of noisy warnings, not fixing yet
-#    5DS.111 \
-#    5DSR.112 \
 
-# SJE these need RESTARTSTART determining for new style boot process,
-# but I don't have roms
-#    7D2.104 \
+# SJE via lclevy, only builds minimal/hello-world so not enabled here
+#    R6.150 \
 
-# SJE FIXME 7D builds are broken, not sure why.  Cam seems very quirky, unsure
-# it's well supported even by mainline.  Disabling for now so I can easily
-# build all cams from platform/ - a useful test
-#    7D.203 \
+# SJE FIXME 7D Master build is broken, related to dcache symbol name,
+# might just need a rename.  Low prio to fix, this is the secondary digic.
 #    7D_MASTER.203 \
 
 
@@ -57,14 +57,15 @@ platform_version = $(word 2, $(subst ., ,$(filter $(1).%, $(PLATFORM_MAP))))
 #   $3 directory prefix with trailing slash (e.g. 'platform/')
 define makerule
 .PHONY: all clean zip check
-.PHONY: $1 $1_clean $1_zip $1_install $1_install_qemu
-.PHONY: $2 $2_clean $2_zip $2_install $2_install_qemu $2_check $2_autoexec_fir
+.PHONY: $1 $1_clean $1_zip $1_install $1_install_qemu $1_disk_image
+.PHONY: $2 $2_clean $2_zip $2_install $2_install_qemu $2_disk_image $2_check $2_autoexec_fir
 
 # append to global all, clean and zip targets
 all: $2
 clean: $2_clean
 zip: $2_zip
 check: $2_check
+disk_image: $2_disk_image
 
 # build the firmware-agnostic make rule, e.g. 5D3 or 5D2 and link to the firmware-specific rule
 $1: $2
@@ -72,6 +73,7 @@ $1_clean: $2_clean
 $1_zip: $2_zip
 $1_install: $2_install
 $1_install_qemu: $2_install_qemu
+$1_disk_image: $2_disk_image
 
 $2:
 	+$(MAKE) -C $3$2
@@ -83,6 +85,8 @@ $2_install:
 	+$(MAKE) -C $3$2 install
 $2_install_qemu:
 	+$(MAKE) -C $3$2 install_qemu
+$2_disk_image:
+	+$(MAKE) -C $3$2 disk_image
 $2_check:
 	@echo $2: $$(shell $$(READELF) -l $3$2/magiclantern 2>/dev/null | $$(GREP) -C 2 MemSiz | $$(GREP) -v EXIDX | $$(GREP) LOAD )
 $2_autoexec_fir:

@@ -289,7 +289,7 @@ void _update_vram_params()
     os.off_1610 = 0;
     //~ os.off_169 = (os.y_ex - os.y_ex * 4/3 * 9/16) / 2;
     //~ os.off_1610 = (os.y_ex - os.y_ex * 4/3 * 10/16) / 2;
-#elif defined(CONFIG_200D) || defined(CONFIG_850D)
+#elif defined(CONFIG_80D) || defined(CONFIG_200D) || defined(CONFIG_77D) || defined(CONFIG_850D)
     // SJE FIXME we should pull this from the DISP Vram struct or similar,
     // at runtime.  At least for D678.
     vram_lv.width = 736; // 720, but 16 pixels of noise after each line
@@ -334,9 +334,51 @@ void _update_vram_params()
     os.off_43 = 0;
     os.off_169 = 0;
     os.off_1610 = 0;
+#elif defined(CONFIG_R5)
+    // false, depends on Panel, HDMI, EVF and if HDMI is clean or not.
+    vram_lv.width = 1024;
+    vram_lv.height = 682;
+    vram_lv.pitch = vram_lv.width * 2;
+    os.x0 = 0;
+    os.y0 = 0;
+    os.x_ex = 720;
+    os.y_ex = 480;
+    os.x_max = os.x0 + os.x_ex;
+    os.y_max = os.y0 + os.y_ex;
+    os.off_43 = 0;
+    os.off_169 = 0;
+    os.off_1610 = 0;
 #elif defined(CONFIG_M50)
     // false, depends on Panel, HDMI, EVF.
     vram_lv.width = 736;
+    vram_lv.height = 480;
+    vram_lv.pitch = vram_lv.width * 2;
+    os.x0 = 0;
+    os.y0 = 0;
+    os.x_ex = 720;
+    os.y_ex = 480;
+    os.x_max = os.x0 + os.x_ex;
+    os.y_max = os.y0 + os.y_ex;
+    os.off_43 = 0;
+    os.off_169 = 0;
+    os.off_1610 = 0;
+#elif defined(CONFIG_SX740)
+    // false, depends on Panel, HDMI.
+    vram_lv.width = 640;
+    vram_lv.height = 480;
+    vram_lv.pitch = vram_lv.width * 2;
+    os.x0 = 0;
+    os.y0 = 0;
+    os.x_ex = 720;
+    os.y_ex = 480;
+    os.x_max = os.x0 + os.x_ex;
+    os.y_max = os.y0 + os.y_ex;
+    os.off_43 = 0;
+    os.off_169 = 0;
+    os.off_1610 = 0;
+#elif defined(CONFIG_SX70)
+    // false, depends on Panel, HDMI.
+    vram_lv.width = 640;
     vram_lv.height = 480;
     vram_lv.pitch = vram_lv.width * 2;
     os.x0 = 0;
@@ -517,7 +559,7 @@ static inline void * get_yuv422buffer(int offset)
 
     // D678 are double-buffered for LV.  Can't put in similar prior block
     // because we want the 0x01000000 check.
-    #ifdef CONFIG_DIGIC_678
+    #ifdef CONFIG_DIGIC_678X
     return (void*)CACHEABLE(YUV422_LV_BUFFER_DISPLAY_ADDR);
     #endif
 

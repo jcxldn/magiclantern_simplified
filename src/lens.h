@@ -10,17 +10,17 @@
  */
 /*
  * Copyright (C) 2009 Trammell Hudson <hudson+ml@osresearch.net>
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the
  * Free Software Foundation, Inc.,
@@ -95,7 +95,8 @@ extern struct lens_info lens_info;
 
 #define DOF_DIFFRACTION_LIMIT_REACHED 1
 
-#if defined(CONFIG_6D) || defined(CONFIG_5D3_123) || defined(CONFIG_100D) || defined(CONFIG_750D)
+#if defined(CONFIG_6D) || defined(CONFIG_5D3_123) || defined(CONFIG_100D) || defined(CONFIG_750D) \
+    || defined(CONFIG_80D) || defined(CONFIG_7D2) || defined(CONFIG_70D) || defined(CONFIG_5D4)
 struct prop_lv_lens
 {
         uint32_t                lens_rotation; // Identical Doesn't Change
@@ -127,7 +128,7 @@ struct prop_lv_lens
 
 SIZE_CHECK_STRUCT( prop_lv_lens, 64 );
 
-#elif defined(CONFIG_200D)
+#elif defined(CONFIG_200D) || defined(CONFIG_77D)
 /* Structure looks exactly like 2nd half of struct on 750D (dumped on both cams)
  * focus_pos was not aligned before and was supposed to be uint16_t.
  * But the first byte is gone, so maybe it was a wrong assumption? */
@@ -205,27 +206,27 @@ SIZE_CHECK_STRUCT( prop_lv_lens, 58 );
 
 #endif
 
-#ifdef CONFIG_DIGIC_VIII
-// TODO: expand for DIGIC X in future
+#if defined(CONFIG_DIGIC_8X)
 /* Digic 8 brings new properties:
  * PROP_LENS_STATIC_DATA  = PROP_LENS + PROP_LENS_NAME + ???
  * PROP_LENS_DYNAMIC_DATA = PROP_LV_LENS + ???
  *
  * Those are quite huge, they size depend on camera.
- * So far we have data from M50, 250D, 850D, R, RP and (bonus) R6.
- *             M50      R     RP    250D   850D    R6
- * STATIC     0x138   0x184  0x184  0x180  0x1C8  0x1C8
- * DYNAMIC    0x84    0x90   0x90   0x8C   0x90   0x94
- * DryOS ICU   P2      P4     P4     P5     P8     P9
+ * So far we have data from following models:
+ *             M50   SX740    R     RP    SX70   250D   850D   R5/R6
+ * STATIC     0x138  0x178  0x184  0x184  0x180  0x180  0x1C8  0x1C8
+ * DYNAMIC    0x84   0x8C   0x90   0x90   0x90   0x8C   0x90   0x94
+ * DryOS ICU   P2     P3     P4     P4     P4     P5     P8     P9
  *
  * A lot of PROP_LENS_STATIC_DATA can be decoded via `readid` evshell function.
+ * Some can be decoded via ShootingInfoEx (models like SX70 don't have readid...)
  *
  * Structs seems to have `packed` attribute set, thus fields moving left and
  * right between models. For easier debugging I left those paddings filled in.
  */
 
-#if defined(CONFIG_M50) || defined(CONFIG_R) || defined(CONFIG_RP) || defined (CONFIG_250D)
-// variants M50, R + RP, 250D combined
+#if defined(CONFIG_M50) || defined(CONFIG_SX70) || defined(CONFIG_SX740) || defined(CONFIG_R) || defined(CONFIG_RP) || defined (CONFIG_250D)
+// variants M50, SX740, R + RP, 250D combined
 struct prop_lens_static_data
 {
         uint8_t                 attached;
@@ -243,7 +244,7 @@ struct prop_lens_static_data
         uint8_t                 lens_type;
 #if defined(CONFIG_R) || defined(CONFIG_RP)
         uint8_t                _pad_01;                        // padding exists on R,RP
-#endif // !defined(CONFIG_250D) || !defined(CONFIG_M50)
+#endif // defined(CONFIG_R) || defined(CONFIG_RP)
         uint8_t                 lens_name_len;
         char                    lens_name[73];
         uint8_t                _unk_03;                        // Not referenced in readid
@@ -257,9 +258,9 @@ struct prop_lens_static_data
         uint8_t                 distortionCorrectionInfo;
         uint8_t                 bcfInfo;
         uint8_t                _unk_04;                        // Not referenced in readid
-#if !defined(CONFIG_250D)
-        uint8_t                _pad_02;                        // padding exists only on 250D
-#endif // !defined(CONFIG_250D)
+#if !defined(CONFIG_250D) && !defined(CONFIG_SX70)
+        uint8_t                _pad_02;                        // 250D, SX70
+#endif // !defined(CONFIG_250D) && !defined(CONFIG_SX70)
 #endif // !defined(CONFIG_M50)
         uint16_t                zoom_pos_size;
         uint16_t                focus_pos_size;
@@ -267,7 +268,7 @@ struct prop_lens_static_data
 #if !defined(CONFIG_M50)
         uint8_t                 av_dlp_lens;
         uint8_t                 av_slow_enable;
-#endif
+#endif // !defined(CONFIG_M50)
         uint8_t                 av_slow_div;
         uint8_t                _unk_05;                        // Not referenced in readid
         uint16_t                av_max_spd;
@@ -275,7 +276,7 @@ struct prop_lens_static_data
         uint16_t                av_min_spd;
 #if defined(CONFIG_M50)
         uint8_t                _unk_06[95];                    // Not referenced in readid
-#elif defined(CONFIG_250D)
+#elif defined(CONFIG_250D) || defined(CONFIG_SX70)
         uint8_t                _unk_06[149];                   // Not referenced in readid
 #else // R, RP, looks like additional padding vs 250D exists
         uint8_t                _unk_06[151];                   // Not referenced in readid
@@ -303,15 +304,20 @@ struct prop_lens_static_data
 #endif
 };
 
+#if defined(CONFIG_SX740)
+#warning FIXME: SX740 prop_lens_static_data is not implemented
+#endif
 #if defined(CONFIG_M50)
 SIZE_CHECK_STRUCT( prop_lens_static_data, 0x138 );
-#elif defined(CONFIG_250D)
+//#elif defined(CONFIG_SX740) kitor FIXME: enable
+//SIZE_CHECK_STRUCT( prop_lens_static_data, 0x178 );
+#elif defined(CONFIG_250D) || defined(CONFIG_SX70)
 SIZE_CHECK_STRUCT( prop_lens_static_data, 0x180 );
-#else  // R, RP
+#else  // R, RP, SX70
 SIZE_CHECK_STRUCT( prop_lens_static_data, 0x184 );
 #endif // size check M50, R, RP, 250D
 
-#elif defined(CONFIG_850D) || defined(CONFIG_R6)
+#elif defined(CONFIG_850D) || defined(CONFIG_R6) || defined(CONFIG_R5)
 /* new struct variant reorders some fields as compared to previous
  * thus making a separate definition */
 struct prop_lens_static_data
@@ -345,10 +351,10 @@ struct prop_lens_static_data
         uint8_t                 bcfInfo;
         uint8_t                 lens_id_1292;
         uint8_t                 emd_hot_limit;
-#if defined(CONFIG_R6)
+#if defined(CONFIG_R6) || defined(CONFIG_R5)
         uint8_t                 aberationControl;              // DNE on 850D
         uint8_t                 _pad_01;
-#endif // defined(CONFIG_R6)
+#endif // defined(CONFIG_R6) || defined(CONFIG_R5)
         uint16_t                zoom_pos_size;
         uint16_t                focus_pos_size;
         uint16_t                fine_focus_size;
@@ -362,9 +368,9 @@ struct prop_lens_static_data
         uint8_t                 extendMagnificationVal;
         uint8_t                _unk_05;
         uint16_t                ois_shift_max;
-#if defined(CONFIG_R6)
+#if defined(CONFIG_R6) || defined(CONFIG_R5)
         uint8_t                 colorBalance;                  // DNE on 850D
-#endif // defined(CONFIG_R6)
+#endif // defined(CONFIG_R6) || defined(CONFIG_R5)
         uint8_t                 pza_exists;
         uint8_t                 pza_id[5];
         uint8_t                 pza_firm_ver[3];
@@ -414,7 +420,7 @@ struct prop_lens_dynamic_data {
         uint16_t                AVMAX;            // ShootingInfoEx: avmax
 #if !defined(CONFIG_M50)
         uint16_t                AVD;              // Not referenced in M50
-#if defined(CONFIG_R6) || defined(CONFIG_850D)
+#if defined(CONFIG_850D) || defined(CONFIG_R6)  || defined(CONFIG_R5)
         uint16_t                NowAvRF;          // Referenced 850D, R6
 #endif
         uint16_t                NowAvEF;          // Not referenced in M50. Before 850D named just NowAv
@@ -423,7 +429,7 @@ struct prop_lens_dynamic_data {
         uint16_t                jsstep;
         uint8_t                _pad_02[4];        // M50, R, RP, 250D, 850D, R6
         uint16_t                IDC;
-#if !defined(CONFIG_M50) && !defined(CONFIG_250D)
+#if !defined(CONFIG_M50) && !defined(CONFIG_250D) && !defined(CONFIG_SX740)
         uint8_t                _pad_03[2];        // R, RP, 850D, R6; not on M50, 250D (alignment?)
 #endif
         uint16_t                po;
@@ -454,10 +460,10 @@ struct prop_lens_dynamic_data {
         uint16_t                fineFocusPos;     // ShootingInfoEx: fine_focus_pos
         uint16_t                HighResoZoomPos;  // ShootingInfoEx: high_res_zoom_pos
         uint16_t                HighResoFocusPos; // ShootingInfoEx: high_res_focus_pos
-#ifdef CONFIG_R6
+#if defined(CONFIG_R5) || defined(CONFIG_R6)
         uint8_t                _r6_01[6];         // only on R6, some extra fields?
 #endif
-#if defined(CONFIG_R6) || defined(CONFIG_R) || defined(CONFIG_RP)
+#if defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_R5) || defined(CONFIG_R6)
         uint8_t                 abstat;           // lens abberation related; exists only on R series
 #endif
         uint8_t                 st1;
@@ -475,7 +481,7 @@ struct prop_lens_dynamic_data {
         uint8_t                 ZmSt3;
         uint8_t                 ZmSt4;
         uint8_t                _pad_05[4];        // M50, R, RP, 250D, 850D, R6
-#if defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_R6)
+#if defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_R5) || defined(CONFIG_R6)
         uint8_t                _pad_05a;          // R, RP, R6 (alignment?)
 #endif
         uint16_t                ts_shift;         // via ShootingInfoEx
@@ -489,18 +495,18 @@ struct prop_lens_dynamic_data {
         uint8_t                 LENSEr;           // not mentioned on 850D
 #if defined(CONFIG_M50)
         uint8_t                _pad_07[7];        // M50
-#elif defined(CONFIG_R6)
+#elif defined(CONFIG_R5) || defined(CONFIG_R6)
         uint8_t                _pad_07[11];       // R6
 #else
         uint8_t                _pad_07[15];       // 850D, 250D, R, RP
 #endif
 };
 
-#if defined(CONFIG_R6)
+#if defined(CONFIG_R5) || defined(CONFIG_R6)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x94 );
-#elif defined(CONFIG_850D) || defined(CONFIG_R) || defined(CONFIG_RP)
+#elif defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_850D)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x90);
-#elif defined(CONFIG_250D)
+#elif defined(CONFIG_250D) || defined(CONFIG_SX740)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x8C);
 #elif defined(CONFIG_M50)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x84);
@@ -508,7 +514,7 @@ SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x84);
 #error No PROP_LENS_DYNAMIC_DATA defined for built cam model
 #endif // /unknown model
 
-#endif // CONFIG_DIGIC_VIII
+#endif // CONFIG_DIGIC_VIII + CONFIG_DIGIC_X
 
 struct prop_focus
 {
@@ -529,7 +535,7 @@ struct prop_picstyle_settings
         int32_t         color_tone; // -4..4
         uint32_t        off_0x10;   // deadbeaf?!
         uint32_t        off_0x14;   // deadbeaf?!
-} __attribute__((aligned,packed));  
+} __attribute__((aligned,packed));
 
 SIZE_CHECK_STRUCT( prop_picstyle_settings, 0x18 );
 
@@ -562,7 +568,7 @@ extern void bv_apply_iso();
 extern void bv_update_lensinfo();
 extern void bv_auto_update();
 
-/* these will retry until exposure change is confirmed 
+/* these will retry until exposure change is confirmed
  * (used for hdr bracketing; to be renamed, since they are also useful for other purposes)
  * they return true on success
  */
@@ -578,8 +584,8 @@ int lens_take_pictures( int wait_to_finish, int allow_af, int duration );
 /** Will return 1 on success, 0 on error */
 extern int
 lens_focus(
-        int num_steps, 
-        int stepsize, 
+        int num_steps,
+        int stepsize,
         int wait,
         int extra_delay
 );
@@ -617,7 +623,7 @@ void lens_set_custom_wb_gains(int gain_R, int gain_G, int gain_B);
 // sprintf("%d,", round(12800 ./ 2.^([56:-1:0]./8)))
                                //~ 100,109,119,130,141,154,168,183,200,218,238,259,283,308,336,367,400,436,476,519,566,617,673,734,800,872,951,1037,1131,1234,1345,1467,1600,1745,1903,2075,2263,2468,2691,2934,3200,3490,3805,4150,4525,4935,5382,5869,6400,6979,7611,12800,25600};
 static const uint16_t values_iso[] = {0,100,110,115,125,140,160,170,185,200,220,235,250,280,320,350,380,400,435,470,500,560,640,700,750,800,860,930,1000,1100,1250,1400,1500,1600,1750,1900,2000,2250,2500,2800,3000,3200,3500,3750,4000,4500,5000,5500,6000,6400,12800,25600};
-static const uint8_t  codes_iso[]  = {0, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,  128,  136}; 
+static const uint8_t  codes_iso[]  = {0, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,  128,  136};
 
 // measured from 5D3 in movie mode with expo override, and rounded manually to match Canon values
 // at long exposures, the real durations are 32 seconds and 16 seconds; don't round those, since it may be important to know if you are using the intervalometer
@@ -712,7 +718,7 @@ void kelvin_toggle( void* priv, int sign );
 #define MAX_ISO_BV 120
 #endif
 
-// max ISO that can be set via FRAME_ISO 
+// max ISO that can be set via FRAME_ISO
 // I think it's the same as max analog ISO
 // todo: ask Guillermo Luijk :)
 #if defined(CONFIG_DIGIC_V)

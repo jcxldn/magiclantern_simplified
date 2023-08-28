@@ -21,26 +21,10 @@
 #define PTR_SYS_OBJS_OFFSET 0xE00401DC   // offset from DryOS base to sys_obj start
 #define PTR_DRYOS_BASE      0xE00401BC
 
-#define ML_MAX_USER_MEM_STOLEN 0x49000 // True max differs per cam, 0x40000 has been tested on
-                                       // the widest range of D678 cams with no observed problems,
-                                       // but not all cams have been tested!
-
-#define ML_MAX_SYS_MEM_INCREASE 0x0 // More may be VERY unsafe!  Increasing this pushes sys_mem
-                                    // higher in memory, at some point that must cause Bad Things,
-                                    // consequences unknown.  0x40000 has been tested, a little...
-
-#define ML_RESERVED_MEM 0x48000 // Can be lower than ML_MAX_USER_MEM_STOLEN + ML_MAX_SYS_MEM_INCREASE,
-                                // but must not be higher; sys_objs would get overwritten by ML code.
-                                // Must be larger than MemSiz reported by build for magiclantern.bin
-
 // Used for copying and modifying ROM code before transferring control.
 // Approximately: look at BR_ macros for the highest address, subtract ROMBASEADDR,
 // align up.  This may not be exactly enough.  See boot-d678.c for longer explanation.
 #define FIRMWARE_ENTRY_LEN 0x228
-
-#if ML_RESERVED_MEM > ML_MAX_USER_MEM_STOLEN + ML_MAX_SYS_MEM_INCREASE
-#error "ML_RESERVED_MEM too big to fit!"
-#endif
 
 /* "Malloc Information" */
 #define MALLOC_STRUCT 0x2885C
@@ -81,7 +65,7 @@
 #define GMT_NFUNCS                  0x7                  //size of table above
 
 #define LVAE_STRUCT                 0x45EF0              // First value written in 0xe12f9d86
-#define CONTROL_BV      (*(uint16_t*)(LVAE_STRUCT+0x28)) // via "lvae_sentcontrolbv"
+#define CONTROL_BV      (*(uint16_t*)(LVAE_STRUCT+0x28)) // via "lvae_setcontrolbv"
 #define CONTROL_BV_TV   (*(uint16_t*)(LVAE_STRUCT+0x36)) // via "lvae_setcontrolaeparam"
 #define CONTROL_BV_AV   (*(uint16_t*)(LVAE_STRUCT+0x38)) // via "lvae_setcontrolaeparam"
 #define CONTROL_BV_ISO  (*(uint16_t*)(LVAE_STRUCT+0x3A)) // via "lvae_setcontrolaeparam"

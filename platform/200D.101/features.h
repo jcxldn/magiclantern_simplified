@@ -18,6 +18,11 @@
 // dumping all the images that old cams support
 #define FEATURE_SCREENSHOT
 
+// cam doesn't expose call("TurnOnDisplay"),
+// (or TurnOffDisplay), so we must find stubs
+// and call directly
+#define CONFIG_NO_DISPLAY_CALLS
+
 // Testing disabling 30min LV timer.
 // This requires prop_request_change!
 // Also requires LV and State objects; but you
@@ -34,15 +39,28 @@
 #define FEATURE_SHOW_CPU_USAGE
 #define FEATURE_SHOW_GUI_EVENTS
 
+// optionally sticky halfshutter
+#define FEATURE_STICKY_HALFSHUTTER
+
 // enable global draw
 #define FEATURE_GLOBAL_DRAW
 #define FEATURE_CROPMARKS
+
+// Enable remapping ROM pages to RAM, before DryOS is initialised.
+// Requires MMU, obviously, but also needs safe memory located
+// that DryOS doesn't touch, for the remap process.
+// Can't use malloc this early on.
+//#define CONFIG_MMU_EARLY_REMAP
+
+// Enable remapping ROM pages to RAM, after DryOS is initialised.
+#define CONFIG_SGI_HANDLERS
+#define CONFIG_MMU_REMAP
 
 // prevent ML attempting stack unwinding in some cases.
 // This does not yet work (assumes ARM, not Thumb).  Alex recommends
 // a good looking fix:
 // http://www.mcternan.me.uk/ArmStackUnwinding/
-#undef CONFIG_CRASH_LOG
+#define CONFIG_CRASH_LOG
 
 #undef CONFIG_ADDITIONAL_VERSION
 #undef CONFIG_AUTOBACKUP_ROM

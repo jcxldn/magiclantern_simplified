@@ -34,6 +34,7 @@ THUMB_FN(0xDF00D299,  bzero32)                /* zeros out a data structure */
 THUMB_FN(0xDF006515,  create_init_task)       /* low-level DryOS initialization */
 THUMB_FN(0xE0040225,  init_task)              /* USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc */
 THUMB_FN(0xE06BE169,  dcache_clean)           /* loop with MCR p15 c7,c10,1; DSB */
+THUMB_FN(0xe0013dcc,  dcache_clean_multicore) /* loop writing to c11007b0, called after dcache_clean by copy_mmu_tables() */
 THUMB_FN(0xE06BE23D,  icache_invalidate)      /* loop with MCR p15 c7,c5,1; c7,c1,6; c7,c1,0; ISB */
 
 /** Tasks **/
@@ -59,8 +60,8 @@ THUMB_FN(0xDF0079E3,  GetMemoryInformation)   /* called from AllocateMemory */
 THUMB_FN(0xDF0079B7,  GetSizeOfMaxRegion)
 THUMB_FN(0xDF00AC55, _alloc_dma_memory)
 THUMB_FN(0xDF00AC81, _free_dma_memory)
-THUMB_FN(0xE0693B23,  malloc)
-THUMB_FN(0xE0693B5B,  free)
+//THUMB_FN(0xE0693B23,  malloc)
+//THUMB_FN(0xE0693B5B,  free)
 
 /** Debug messages **/
 THUMB_FN(0xDF006E6D,  DryosDebugMsg)          /* lots of debug messages; format string is third argument */
@@ -108,6 +109,8 @@ DATA_PTR(    0x4034,  post_isr_hook)
 DATA_PTR(   0x6CC10,  isr_table_handler)
 DATA_PTR(   0x6CC14,  isr_table_param)
 THUMB_FN(0xE0137001,  cli_spin_lock)          /* used in AllocateMemory/FreeMemory and others */
+THUMB_FN(0xe0137048,  send_software_interrupt) // int 10 is used by DryOS to sleep/wake cpu1
+//THUMB_FN(0xe0004d30,  wfi_sinkhole) // used to make cpu wait for int 10
 
 /** MPU communication **/
 THUMB_FN(0xE01C7657,  mpu_send)                  // "dwSize < TXBD_DATA_SIZE"
@@ -119,8 +122,10 @@ DATA_PTR(   0x87998,  mpu_recv_ring_buffer)      // ring buffer used in SIO3_ISR
 DATA_PTR(    0x799C,  mpu_recv_ring_buffer_tail) // ring buffer index incremented in the above subroutine
 
 /** Misc **/
-THUMB_FN(0xE11C7CF9,  vsnprintf)              /* called near dmstart; references "01234567", "0123456789", "0123456789abcdef"
-                                                 and "0123456789ABCDEF"; second arg is size; the one called by DebugMsg only knows %s */
+THUMB_FN(0xe00764f0,  vsnprintf) // references "01234567", "0123456789", "0123456789abcdef" and "0123456789ABCDEF"; second arg is size.
+                                 // There's a somewhat vsnprintf-like at df009038, which only understands %s, not e.g. %x, don't use it.
+                                 // There's another at e11c7cf8 which has an unusual "ERROR" string.
+
 
 // SJE stuff found during investigation, maybe not needed for ML
 // but I wanted to call by name
@@ -138,6 +143,10 @@ DATA_PTR(    0xfd78,  winsys_sem_count)
 DATA_PTR(    0xfd7c,  winsys_sem)
 DATA_PTR(    0xfec8,  bmp_vsync_cbr)
 THUMB_FN(0xe049e96c,  BmpVsyncCallBack)
+
+// call("TurnOffDisplay") returns -1 on 200D, no longer exists?
+THUMB_FN(0xe048fcac, _turn_off_display)
+THUMB_FN(0xe048fc98, _turn_on_display)
 
 // SJE unsure stuff: currently majority copied from 50D (I have roms for this),
 // or 100D (more modern, presumably sort of similar)
@@ -299,7 +308,16 @@ THUMB_FN(0xe025e949, XimrContextInputLayerSetDimensions)
 THUMB_FN(0xe021ded9, WinSys_AllocateMemory)
 THUMB_FN(0xe021df7d, WinSys_FreeMemory)
 
-
+// MMU related, required by CONFIG_MMU features
+THUMB_FN(0xe0004a5a, change_mmu_tables) // Updates TTBRs and does TLB maintenance
+THUMB_FN(0xe0013cc4, copy_mmu_tables) // copies from one location to another,
+                                      // fixing up addresses held in table start,
+                                      // and doing cache maintenance
+// slightly MMU related, used by CONFIG_MMU_EARLY_REMAP
+ARM32_FN(0xe001654c, memcpy_dryos) // useful in early contexts when we don't have
+                                   // dietlibc or newlib, and can't use stdio memcpy64 because
+                                   // that wants ML assert handling initialised.
+THUMB_FN(0xe00138c2,  early_printf) // printf compatible with bootloader context
 
 
 DATA_PTR(   0xfd84,  bmp_vram_info) // function e04a044c looks relevant, see refs to 0x3c0 and 0x21c; 960x540
@@ -356,6 +374,30 @@ THUMB_FN(0xdf00325d,  task_trampoline)
 //NSTUB(0xFF968690,  mvrSetDefQScale)
 //NSTUB(0xFF9686C8,  mvrSetFullHDOptSize)
 //NSTUB(0xFF968874,  mvrFixQScale)
+
+// Sockets
+THUMB_FN(0xe071d880,  socket_create);
+THUMB_FN(0xe071d8b8,  socket_bind);
+THUMB_FN(0xe071d8f2,  socket_connect);
+THUMB_FN(0xe071d92c,  socket_listen);
+THUMB_FN(0xe071db7a,  socket_shutdown);
+THUMB_FN(0xe071d960,  socket_accept);
+THUMB_FN(0xe071d99a,  socket_recv);
+THUMB_FN(0xe071d9d8,  socket_recvfrom);
+THUMB_FN(0xe071da20,  socket_send);
+THUMB_FN(0xe071da3a,  socket_sendto);
+THUMB_FN(0xe071da80,  socket_setsockopt);
+THUMB_FN(0xe071dac4,  socket_getsockopt);
+THUMB_FN(0xe0714a20,  socket_close_caller);
+THUMB_FN(0xe07321f4,  socket_convertfd);
+THUMB_FN(0xe0714b1c,  socket_select_caller); // not the actual select function as this needs the fd converted
+
+THUMB_FN(0xe036d59c,  wlan_connect);
+THUMB_FN(0xe0715828, set_IP_address); // sets both client IP and gateway IP
+THUMB_FN(0xe07159e8, nif_setup); // initialises network interface, set_IP_address() fails if this hasn't been called,
+                                 // even if wlan_connect has already succeeded.  So I guess this is at a different layer.
+                                 // wlanipset calls this for us, but that doesn't set gateway IP.
+
 
 // SJE maybe 0xe007e056 is important.  This loops doing a "DmacCh" related function, and that gets us
 // to 0x36bf0 - there's a few functions there that ref edmac related strings!

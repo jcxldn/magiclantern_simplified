@@ -29,7 +29,9 @@
 #include <sys/types.h>
 #include <utime.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
+#include <sys/time.h>
 #ifndef WIN32
 #include <sys/mman.h>
 #endif
@@ -2513,7 +2515,7 @@ int recvtimeout ( int s, char *buf, int len, int timeout )
 }
 
 
-unsigned int gdb_loop (int socket)
+void gdb_loop (int socket)
 {
     char buffer[8192];
     while(1)
@@ -3348,7 +3350,7 @@ int chdk(int busn, int devn, short force)
                         }
                         
                         rate = 1000000.0f / (avgDelta / maxVal);
-                        printf("Overflows: %i µsec (avg: %f), maxVal = 0x%08X, tickRate = %f Hz\n", delta, avgDelta, maxVal, rate);
+                        printf("Overflows: %i usec (avg: %f), maxVal = 0x%08X, tickRate = %f Hz\n", delta, avgDelta, maxVal, rate);
                     }
                 }
                 

@@ -11,7 +11,13 @@
 #include <arpa/inet.h>
 
 /* Define generic byte swapping functions */
+#if HAVE_BYTESWAP_H
 #include <byteswap.h>
+#else
+#define bswap_16(value) ((((value) & 0xff) << 8) | ((value) >> 8))
+#define bswap_32(value) (((uint32_t)bswap_16((uint16_t)((value) & 0xffff)) << 16) | (uint32_t)bswap_16((uint16_t)((value) >> 16)))
+#define bswap_64(value) (((uint64_t)bswap_32((uint32_t)((value) & 0xffffffff)) << 32) | (uint64_t)bswap_32((uint32_t)((value) >> 32)))
+#endif
 #endif
 
 #define swap16(x) bswap_16(x)
@@ -36,10 +42,22 @@
 /* boundaries in order to work properly on all architectures */
 
 /* Uncomment if system endian.h does not provide them */
-#define htobe16(x) htons(x)
-#define htobe32(x) htonl(x)
-#define be16toh(x) ntohs(x)
-#define be32toh(x) ntohl(x)
+
+#ifndef htobe16
+  #define htobe16(x) htons(x)
+#endif // htobe16
+
+#ifndef htobe32
+  #define htobe32(x) htonl(x)
+#endif // htobe32
+
+#ifndef be16toh
+  #define be16toh(x) ntohs(x)
+#endif // be16toh
+
+#ifndef be32toh
+  #define be32toh(x) ntohl(x)
+#endif //be32toh
 
 #define HTOBE16(x) (x) = htobe16(x)
 #define HTOBE32(x) (x) = htobe32(x)
@@ -47,12 +65,29 @@
 #define BE16TOH(x) (x) = be16toh(x)
 
 /* On little endian machines, these macros are null */
-#define htole16(x)      (x)
-#define htole32(x)      (x)
-#define htole64(x)      (x)
-#define le16toh(x)      (x)
-#define le32toh(x)      (x)
-#define le64toh(x)      (x)
+#ifndef htole16
+  #define htole16(x)      (x)
+#endif // htole16
+
+#ifndef htole32
+  #define htole32(x)      (x)
+#endif // htole32
+
+#ifndef htole64
+  #define htole64(x)      (x)
+#endif // htole64
+
+#ifndef le16toh
+  #define le16toh(x)      (x)
+#endif // le16toh
+
+#ifndef le32toh
+  #define le32toh(x)      (x)
+#endif // le32toh
+
+#ifndef le64toh
+  #define le64toh(x)      (x)
+#endif // le64toh
 
 #define HTOLE16(x)      (void) (x)
 #define HTOLE32(x)      (void) (x)

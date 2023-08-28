@@ -6,6 +6,7 @@
 // * AJ for the idea of shutting down ML tasks manually, rather than letting DryOS do this job
 
 #include "dryos.h"
+#include "task_utils.h"
 #include "property.h"
 #include "bmp.h"
 #include "tskmon.h"
@@ -17,33 +18,6 @@
 #include "lens.h"
 
 int ml_shutdown_requested = 0;
-
-const char * get_task_name_from_id(int id)
-{
-#if defined(CONFIG_VXWORKS)
-return "?";
-#endif
-    if(id < 0) {
-        return "?";
-    }
-    // This looks like returning local vars, but ISO C99 6.4.5.5 says
-    // string literals have "static storage duration", and 6.2.4.3
-    // defines that as "Its lifetime is the entire execution of the program
-    // and its stored value is initialized only once, prior to program startup"
-    //
-    // So it's okay.
-
-    char *name = "?";
-    struct task_attr_str task_attr = {0};
-
-    int r = get_task_info_by_id(1, id & 0xff, &task_attr);
-    if (r == 0) {
-        if (task_attr.name != NULL) {
-            name = task_attr.name;
-        }
-    }
-    return name;
-}
 
 #ifndef CONFIG_VXWORKS
 #ifdef CONFIG_TSKMON
@@ -322,7 +296,7 @@ MENU_UPDATE_FUNC(tasks_print)
                 task_id, short_name, task_attr.pri, task_attr.wait_id, mem_percent, 0, task_attr.state);
             #endif
 
-            #if defined(CONFIG_60D) || defined(CONFIG_7D) || defined(CONFIG_DIGIC_V) || defined(CONFIG_DIGIC_678)
+            #if defined(CONFIG_60D) || defined(CONFIG_7D) || defined(CONFIG_DIGIC_V) || defined(CONFIG_DIGIC_678X)
             y += font_small.height - ((tasks_show_flags & 1) ? 1 : 0); // too many tasks - they don't fit on the screen :)
             #else
             y += font_small.height;
@@ -388,7 +362,7 @@ PROP_HANDLER(PROP_TERMINATE_SHUT_REQ)
     if (buf[0] == 0)  ml_shutdown();
 }
 
-#ifdef CONFIG_DIGIC_VIII //kitor: Confirmed R, RP, M50
+#if defined(CONFIG_DIGIC_8X)
 PROP_HANDLER(PROP_SHUTDOWN_REASON)
 {
     DryosDebugMsg(0, 15, "SHUTDOWN REASON %d", buf[0]);

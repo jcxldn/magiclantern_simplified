@@ -1058,8 +1058,11 @@ static void stub_test_dryos()
     TEST_FUNC(task_create("test", 0x1c, 0x1000, test_task, 0));
     msleep(100);
     TEST_FUNC_CHECK(test_task_created, == 1);
+
+    // This fetches name via task_attr
     TEST_FUNC_CHECK_STR(get_current_task_name(), "run_test");
-    TEST_FUNC_CHECK_STR(get_task_name_from_id(current_task->taskId), "run_test");
+    // Compare with name via task struct, a check for inconsistencies in our struct definitions
+    TEST_FUNC_CHECK_STR(get_task_name_from_id(get_current_task_id()), "run_test");
 
     extern int task_max;
     TEST_FUNC_CHECK(task_max, >= 104);    /* so far, task_max is 104 on most cameras */
@@ -1098,32 +1101,27 @@ static void stub_test_model_id()
     // model, firmware version
     TEST_MSG("[INFO] Camera model: %s %s (0x%X %s)\n", camera_model, firmware_version, camera_model_id, __camera_model_short);
 
-    TEST_FUNC_CHECK(is_camera("DIGIC", "*"), == 1);
     TEST_FUNC_CHECK(is_camera(__camera_model_short, firmware_version), == 1);
 
     if (is_camera("5D3", "*"))
     {
         TEST_FUNC_CHECK(is_camera("5D2", "*"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "4"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "5"), == 1);
+        TEST_FUNC_CHECK(get_digic_version(), == 5);
     }
     else if (is_camera("60D", "*"))
     {
         TEST_FUNC_CHECK(is_camera("600D", "*"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "5"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "4"), == 1);
+        TEST_FUNC_CHECK(get_digic_version(), == 4);
     }
     else if (is_camera("80D", "*"))
     {
         TEST_FUNC_CHECK(is_camera("70D", "*"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "5"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "6"), == 1);
+        TEST_FUNC_CHECK(get_digic_version(), == 6);
     }
     else if (is_camera("200D", "*"))
     {
         TEST_FUNC_CHECK(is_camera("100D", "*"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "6"), == 0);
-        TEST_FUNC_CHECK(is_camera("DIGIC", "7"), == 1);
+        TEST_FUNC_CHECK(get_digic_version(), == 7);
     }
 }
 

@@ -77,8 +77,6 @@ prepare_zip: FORCE
 	$(eval export INSTALL_FINISH)
 	$(eval export WIFI_SD)
 	$(call rm_dir, $(INSTALL_DIR)/)
-	$(call rm_files, $(PLATFORM_PATH)/*/magiclantern.sym) # only check module dependencies on current camera model
-	$(warning removing $(PLATFORM_PATH)/*/magiclantern.sym)
 	mkdir -p $(INSTALL_DIR)
 
 # zip.txt must be the first item on the list!
@@ -92,6 +90,10 @@ magiclantern-$(VERSION).zip: install installer_check installdoc
 zip:: | prepare_zip
 zip:: magiclantern-$(VERSION).zip print_build_info
 
+disk_image: zip
+	cd $(PLATFORM_PATH)/$(ML_MODEL_DIR)
+	$(PYTHON3) $(PLATFORM_PATH)/create_disk_image_from_zip.py magiclantern-$(VERSION).zip
+
 install_qemu:: | prepare_zip
 install_qemu:: install
 	$(call build,MTOOLS,cd $(QEMU_PATH)/; ./mtools_copy_ml.sh $(INSTALL_DIR))
@@ -99,6 +101,7 @@ install_qemu:: install
 clean::
 	$(call rm_dir, zip)
 	$(call rm_files, *.zip)
+	$(call rm_files, sd.qcow2 cf.qcow2 guestmount.pid)
 
 FORCE:
 

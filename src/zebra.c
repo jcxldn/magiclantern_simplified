@@ -3583,7 +3583,7 @@ int liveview_display_idle()
         )
         return 0;
 
-#ifdef CONFIG_DIGIC_678
+#ifdef CONFIG_DIGIC_678X
 /* For Digic 6 and up. Check if LiveViewApp dialog pointer is not null.
  * This is true only in LV.
  * Maybe this can be backported to below Digic 6 - needs research. */
@@ -3925,7 +3925,7 @@ BMP_LOCK (
     }
 #endif
 
-#ifdef CONFIG_DIGIC_678
+#ifdef CONFIG_DIGIC_678X
 /**
  * kitor: On D678 apps handlers that are in our interest either doesn't show up
  * on `gui_task_list` at all, or are buried down on the list (would require
@@ -3988,7 +3988,7 @@ BMP_LOCK (
             clrscr(); // out of luck, fallback
         }
     }
-#endif //CONFIG_DIGIC_678
+#endif //CONFIG_DIGIC_678X
 )
 
     // ask other stuff to redraw
@@ -4137,7 +4137,12 @@ livev_hipriority_task( void* unused )
         if (raw && lv_dispsize == 1 && !is_movie_mode())
         {
             /* only raw zebras, raw histogram and raw spotmeter are working in LV raw mode */
+            // 70D has problems with RAW zebras
+            // TODO: Adjust with appropriate internals-config: CONFIG_NO_RAW_ZEBRAS
+            // (is this name good?  We already have FEATURE_RAW_ZEBRAS...  what's the distinction?)
+            #if !defined(CONFIG_70D)
             if (zebra_draw && raw_zebra_enable == 1) raw_needed = 1;        /* raw zebras: always */
+            #endif
             if (hist_draw && RAW_HISTOGRAM_ENABLED) raw_needed = 1;          /* raw hisogram (any kind) */
             if (spotmeter_draw && spotmeter_formula == 3) raw_needed = 1;   /* spotmeter, units: raw */
         }

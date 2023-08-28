@@ -124,6 +124,99 @@ int GetFreeMemForMalloc()
     return MALLOC_FREE_MEMORY;
 }
 
+// This is for tracking allocs from malloc_aligned(),
+// where we don't return the real start of the block,
+// but later need to know it to use free_aligned()
+// with the returned pointer.
+struct alloc_str
+{
+    uint32_t start;
+    uint32_t len;
+};
+// Because we need to track them, and because aligned allocs
+// can be much less space efficient, limit these to a small number.
+#define MAX_ALIGNED_ALLOCS 16
+static struct alloc_str aligned_allocs[MAX_ALIGNED_ALLOCS] = {{0, 0}};
+static uint32_t alloc_count = 0;
+
+// As malloc(), but takes an alignment.  The returned pointer
+// will point to an address aligned to that value,
+// or NULL on failure.
+//
+// Must be paired with free_aligned().
+// Will crash if free() is used on a pointer obtained via malloc_aligned().
+//
+// E.g. malloc_aligned(0x80, 0x100) might return 0x100200,
+// and internally this might be a block of size 0x180,
+// starting at 0x100104.
+void *malloc_aligned(size_t len, uint32_t alignment)
+{
+    // The current implementation is quite naive, and inefficient
+    // if the alignment is large in comparison to the size.
+    //
+    // This function is presently used very rarely and with fairly
+    // large blocks.
+
+    if (alloc_count >= MAX_ALIGNED_ALLOCS)
+        return NULL; // too many aligned allocs to track
+
+    void *raw_ptr = _malloc(len + alignment);
+    if (raw_ptr == NULL)
+        return NULL; // DryOS malloc failed
+
+    // find a slot to store alloc info, so we can later free
+    uint32_t i = 0;
+    if (aligned_allocs[alloc_count].start == 0)
+    {
+        i = alloc_count;
+    }
+    else
+    {
+        while (i < MAX_ALIGNED_ALLOCS)
+        {
+            if (aligned_allocs[i].start == 0)
+                break;
+            i++;
+        }
+    }
+
+    uint32_t raw_ptr_val = (uint32_t)raw_ptr;
+    aligned_allocs[i].start = raw_ptr_val;
+    aligned_allocs[i].len = len;
+    alloc_count++;
+
+    //DryosDebugMsg(0, 15, "raw_ptr_val: 0x%x", raw_ptr_val);
+    if (raw_ptr_val % alignment != 0)
+    {
+        raw_ptr_val += alignment - raw_ptr_val % alignment;
+    }
+    //DryosDebugMsg(0, 15, "raw_ptr_val: 0x%x", raw_ptr_val);
+
+    return (void *)raw_ptr_val;
+}
+
+// Used for freeing pointers returned by malloc_aligned()
+void free_aligned(void *ptr)
+{
+    uint32_t ptr_val = (uint32_t)ptr;
+    uint32_t i = 0;
+
+    // find which block holds this allocation
+    while (i < MAX_ALIGNED_ALLOCS)
+    {
+        if (aligned_allocs[i].start <= ptr_val
+            && aligned_allocs[i].start + aligned_allocs[i].len > ptr_val)
+        {
+            _free((void *)aligned_allocs[i].start);
+            aligned_allocs[i].start = 0;
+            aligned_allocs[i].len = 0;
+            alloc_count--;
+            break;
+        }
+        i++;
+    }
+}
+
 static struct mem_allocator allocators[] = {
     {
         .name = "malloc",
@@ -992,7 +1085,7 @@ static void guess_free_mem_task(void *priv, int delta)
     max_shoot_malloc_mem = 0;
     max_shoot_malloc_frag_mem = 0;
 
-#ifdef CONFIG_DIGIC_678
+#ifdef CONFIG_DIGIC_678X
     // SJE only tested on 200D, but there, trying to create
     // a task with a too large stack via stack_size_crit()
     // triggers Err 70.  128 it gets glitchy, 256 dies hard.
@@ -1118,7 +1211,7 @@ static void guess_free_mem_task(void *priv, int delta)
     /* mallocs can resume now */
     give_semaphore(mem_sem);
 
-#ifdef CONFIG_DIGIC_678
+#ifdef CONFIG_DIGIC_678X
 // SJE FIXME the old code crashes on new Digic,
 // because it tries to read from forbidden regions.
 //
@@ -1233,7 +1326,7 @@ static MENU_UPDATE_FUNC(meminfo_display)
                 { (uint32_t) bmp_vram_idle(),           "BMI" },    /* "idle" BMP buffer (back buffer) */
                 { (uint32_t) bmp_vram_real(),           "BMP" },    /* current BMP buffer (displayed on the screen) */
                 { YUV422_LV_BUFFER_DISPLAY_ADDR,        "LVD" },    /* current LV YUV buffer (displayed) */
-#ifndef CONFIG_DIGIC_678
+#ifndef CONFIG_DIGIC_678X
 // These addresses are not yet known for modern Digic.  They may not
 // even exist as the drawing routines are changed significantly by Ximr.
                 { shamem_read(REG_EDMAC_WRITE_LV_ADDR), "LVW" },    /* LV YUV buffer being written by EDMAC */

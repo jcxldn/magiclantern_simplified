@@ -1823,7 +1823,8 @@ void kelvin_toggle( void* priv, int sign )
     lens_set_kelvin(k);
 }
 
-PROP_INT( PROP_WB_KELVIN_PH, wb_kelvin_ph );
+//defined via PROP_INT(PROP_WB_KELVIN_PH, wb_kelvin_ph) in lens.c
+extern uint32_t wb_kelvin_ph;
 
 static MENU_UPDATE_FUNC(kelvin_display)
 {
@@ -6344,7 +6345,8 @@ shoot_task( void* unused )
             #endif
 
 #ifdef FEATURE_AUDIO_REMOTE_SHOT
-#if defined(CONFIG_7D) || defined(CONFIG_6D) || defined(CONFIG_650D) || defined(CONFIG_700D) || defined(CONFIG_EOSM) || defined(CONFIG_100D)
+#if defined(CONFIG_7D) || defined(CONFIG_6D) || defined(CONFIG_650D) || defined(CONFIG_700D) \
+    || defined(CONFIG_EOSM) || defined(CONFIG_100D) || defined(CONFIG_70D)
             /* experimental for 7D now, has to be made generic */
             static int last_audio_release_running = 0;
             

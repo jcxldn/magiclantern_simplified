@@ -35,7 +35,6 @@
 #include "zebra.h"
 #include "cropmarks.h"
 #include "battery.h"
-#include "lens.h"
 #include "shoot.h"
 #include "hdr.h"
 #include "fps.h"
@@ -63,7 +62,7 @@ static CONFIG_INT("movie.log", movie_log, 0);
 #ifdef CONFIG_FULLFRAME
 #define SENSORCROPFACTOR 10
 #define crop_info 0
-#elif defined(CONFIG_600D)
+#elif defined(CONFIG_600D) || defined(CONFIG_70D)
 static PROP_INT(PROP_DIGITAL_ZOOM_RATIO, digital_zoom_ratio);
 #define DIGITAL_ZOOM ((is_movie_mode() && video_mode_crop && video_mode_resolution == 0) ? digital_zoom_ratio : 100)
 #define SENSORCROPFACTOR (16 * DIGITAL_ZOOM / 100)
@@ -579,6 +578,12 @@ static volatile int lv_focus_requests = 0;
 static volatile int lv_focus_done = 1;
 static volatile int lv_focus_error = 0;
 
+// 70D focus features don't play well with this and
+// soft limit is reached very quickly
+// see http://www.magiclantern.fm/forum/index.php?topic=14309.msg152551#msg152551
+// skipping the check helps but for e.g. focus stacking is still buggy
+// and takes 1 behind and 1 before all others afterwards are before at the same
+// position no matter what's set in menu
 PROP_HANDLER( PROP_LV_FOCUS_DONE )
 {
     /* turn off the LED we enabled in lens_focus */
@@ -1229,7 +1234,8 @@ PROP_HANDLER( PROP_MVR_REC_START )
     #endif
 }
 
-#ifdef CONFIG_DIGIC_VIII //confirmed R, RP, M50
+#if defined(CONFIG_DIGIC_8X)
+//confirmed R, RP, M50
 PROP_HANDLER( PROP_LENS_STATIC_DATA )
 {
     ASSERT(len == sizeof(struct prop_lens_static_data));
@@ -1764,8 +1770,8 @@ void _lens_dynamic_data_post_update()
     update_stuff();
 }
 
-#if !defined(CONFIG_DIGIC_VIII)
-// DIGIC8 uses PROP_LENS_DYNAMIC_DATA
+#if !defined(CONFIG_DIGIC_VIII) && !defined(CONFIG_DIGIC_X)
+// DIGIC8+ uses PROP_LENS_DYNAMIC_DATA
 /* only used for requesting a refresh of PROP_LV_LENS;
  * raw data is model-dependent, do not use directly */
 static struct prop_lv_lens lv_lens_raw;
@@ -1818,7 +1824,7 @@ void _prop_lv_lens_request_update()
 }
 #endif
 
-#ifdef CONFIG_DIGIC_VIII
+#if defined(CONFIG_DIGIC_8X)
 PROP_HANDLER( PROP_LENS_DYNAMIC_DATA )
 {
     if(len != sizeof(struct prop_lens_dynamic_data))
@@ -2763,7 +2769,7 @@ static LVINFO_UPDATE_FUNC(picq_update)
 
     if (!is_movie_mode())
     {
-#ifdef CONFIG_DIGIC_VIII
+#if defined(CONFIG_DIGIC_8X)
 /* via R.180, confirmed RP.160; M50 and 850D have the same set of modes:
  * L        03030100   .XX .... ..XX .... ...X .... ....
  * l        03020100   .XX .... ..X. .... ...X .... ....
@@ -2774,6 +2780,8 @@ static LVINFO_UPDATE_FUNC(picq_update)
  * S2       0303010F   .XX .... ..XX .... ...X .... XXXX
  * CRAW     03030600   .XX .... ..XX .... .XX. .... ....
  * RAW      04030600   X.. .... ..XX .... .XX. .... ....
+ * via SX740.110, there's only one S mode:
+ * S        03030102   .XX .... ..XX .... ...X .... ..X.
  * Some combinations:
  *  RAW + L 04030700   X.. .... ..XX .... .XXX .... ....
  *  RAW + l 04020700   X.. .... ..X. .... .XXX .... ....
@@ -2791,9 +2799,9 @@ static LVINFO_UPDATE_FUNC(picq_update)
         int rawsize = pic_quality & 0xF;
         int jpegtype = pic_quality >> 24;
         int jpegsize = (pic_quality >> 8) & 0xFF;
-#endif //CONFIG_DIGIC_VIII
+#endif //CONFIG_DIGIC_VIII + CONFIG_DIGIC_X
         snprintf(buffer, sizeof(buffer), "%s%s%s",
-#ifdef CONFIG_DIGIC_VIII
+#if defined(CONFIG_DIGIC_8X)
             raw ? (rawsize ? "RAW" : "CRAW") : "",  // just two options on D8
 #else
             rawsize == 1 ? "mRAW" : rawsize == 2 ? "sRAW" : rawsize == 7 ? "sRAW1" : rawsize == 8 ? "sRAW2" : raw ? "RAW" : "",

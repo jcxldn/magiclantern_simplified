@@ -36,6 +36,17 @@
 /* we need this ASM block to be the first thing in the file */
 #pragma GCC optimize ("-fno-reorder-functions")
 
+// SJE I believe the above comment is incorrect and the pragma
+// doesn't keep the ASM block at the start of the file.
+// I think the .text / _start stuff in the asm does that.
+// I believe the reason it wants to be first is because the
+// build system uses that to locate it at the start of
+// autoexec.bin.
+//
+// Local tests show that functions above this point still get
+// placed later in the object file.  This means we can call
+// functions from asm if we want.
+
 /* polyglot startup code that works if loaded as either ARM or Thumb */
 asm(
     ".text\n"
@@ -54,8 +65,8 @@ asm(
     "loaded_as_thumb:\n"        /* you may insert Thumb-specific code here */
 
 /* this does not compile on DIGIC 5 and earlier */
-#if defined(CONFIG_DIGIC_VII) || defined(CONFIG_DIGIC_VIII)
-    "MRC    p15,0,R0,c0,c0,5\n" /* refuse to run on cores other than #0 */
+#if defined(CONFIG_DIGIC_VII) || defined(CONFIG_DIGIC_VIII)  || defined(CONFIG_DIGIC_X)
+    "MRC    p15,0,R0,c0,c0,5\n" /* refuse to run ML on cores other than #0 */
     "ANDS.W R0, R0, #3\n"       /* read the lowest 2 bits of the MPIDR register */
     "ITTT   NE\n"               /* check if CPU ID is nonzero (i.e. other cores) */
     "LDRNE  R0, rombaseaddr\n"  /* jump to main firmware if running from other cores */
@@ -277,7 +288,7 @@ cstart( void )
     sync_caches();
 
     #ifdef CONFIG_MARK_UNUSED_MEMORY_AT_STARTUP
-      #ifdef CONFIG_DIGIC_VIII
+      #if defined(CONFIG_DIGIC_8X)
         /* EOS R has 2 GiB of RAM, but memory above BFE00000 has special meaning. */
         /* RscMgr shows used memory regions until BEE10000. */
         /* Without this trick, RAM content until BFE00000 looks like electrical noise. */
@@ -296,11 +307,9 @@ cstart( void )
       #ifdef CONFIG_DIGIC_IV    /* 7D */
         MEM(0xC0A00024) = 0x80000010; // send SSTAT for master processor, so it is in right state for rebooting
       #endif
-      #ifdef CONFIG_5D4
-        //
-      #elif defined(CONFIG_DIGIC_VI) // 5DS, 5DSR, 7D2 do this, but 5D4 doesn't.
-                                     // See 7D2 1.1.2 fe024ae0, the large switch statement,
-                                     // case 0x78, calls fe028f7c
+      #if defined(CONFIG_DIGIC_VI) // 5DS, 5DSR, 7D2 do this.
+                                   // See 7D2 1.1.2 fe024ae0, the large switch statement,
+                                   // case 0x78, calls fe028f7c
         set_S_TX_DATA(0x20040);
       #endif
     #endif
@@ -315,18 +324,29 @@ cstart( void )
       #endif
     #endif
     #ifdef CONFIG_850D
-        // not the same addresses as other D8 (R, RP, M50 at least), and it requires
-        // you store the address with thumb bit set, other D8 add one to stored value.
+        // Digic 8 "new style" first stage loader uses just a single pointer for startup.
+        // The difference is that it has to have thumb bit set.
+        // So far only 850D is known to use it on Digic 8
         MEM(0xBFE01FC4) = ROMBASEADDR | 0x1;
-        // looks like setting the flag is replaced by a cache sync
+    #elif defined(CONFIG_DIGIC_X)
+        // Digic X uses similar 1st stage loader to Digic 8 "new style" one.
+        // Memory locations are different, it is 0xDFFxxxxx range now.
+        MEM(0xDFFC4FA0) = ROMBASEADDR | 0x1;
     #elif defined(CONFIG_DIGIC_VIII)
-        MEM(0xBFE01FC8) = ROMBASEADDR;  /* required by EOS R; possibly also by M50 etc */
-        MEM(0xBFE01FC4) = 0x10;         /* guess: start the second core at the above address */
+        // DIGIC 8 "older style" first stage bootloader require those two to be set.
+        // Code sets thumb bit before branch, so it can be left as ROMBASEADDR
+        // M50, R, RP, 250D, M6 II, PS SX740...
+        MEM(0xBFE01FC4) = 0x10;         // unknown meaning
+        MEM(0xBFE01FC8) = ROMBASEADDR;  // pointer used by 2nd core to run 2nd stage loader
     #endif
+
+    // Newer models do it after writing 2nd core boot address
+    // It won't hurt on those who don't.
+    sync_caches();
 
     #if 0
       qprint("[boot] jump to main firmware: "); qprintn(ROMBASEADDR); qprint("\n");
-      #if defined(CONFIG_DIGIC_VII) || defined(CONFIG_DIGIC_VIII)
+      #if defined(CONFIG_DIGIC_78X)
         void __attribute__((long_call)) (*main_firmware)() = (void*) (ROMBASEADDR | 1);
       #else
         void __attribute__((long_call)) (*main_firmware)() = (void*) ROMBASEADDR;

@@ -85,8 +85,9 @@ static void dump_bytes(uint32_t address, uint32_t len)
 static void DUMP_ASM dump_task()
 {
     // LED blinking test
-    led_blink(3, 500, 200);
+    led_blink(30, 500, 200);
 
+#if 0
     //while(MEM(0xFD8C) == 0)
     //{
     //    led_blink(1, 100, 100);
@@ -101,6 +102,8 @@ static void DUMP_ASM dump_task()
         vram_current = vram2;
     else
         vram_current = vram1;
+#endif
+
 #if 0
     // find screen dimensions from MARV struct
     static uint32_t disp_xres = 0;
@@ -160,7 +163,7 @@ static void DUMP_ASM dump_task()
     log_start();
 #endif
 
-#if 1
+#if 0
 
     // MPU events are logged to file in log-d678.c,
     // use halfshutter to demark when other buttons
@@ -332,7 +335,7 @@ static void DUMP_ASM dump_task()
 #endif
 
     /* save a diagnostic log */
-    log_finish();
+//    log_finish();
     call("dumpf");
 }
 
@@ -340,7 +343,7 @@ static void DUMP_ASM dump_task()
 void boot_pre_init_task(void)
 {
 #ifdef LOG_EARLY_STARTUP
-    log_start();
+//    log_start();
 #endif
 }
 
@@ -348,7 +351,7 @@ void boot_pre_init_task(void)
 void boot_post_init_task(void)
 {
 #ifndef LOG_EARLY_STARTUP
-    log_start();
+//    log_start();
 #endif
 
     msleep(1000);

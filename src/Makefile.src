@@ -84,7 +84,8 @@ ML_OBJS-y = \
 	$(ML_MINIMAL_OBJ) \
 	cache.o \
 	font_direct.o \
-	$(PLATFORM_DIR)/stubs.o
+	task_utils.o \
+	$(PLATFORM_DIR)/stubs.o \
 
 else ifeq ($(ML_SRC_PROFILE),installer)
 ML_INSTALLER_OBJS = \
@@ -118,7 +119,12 @@ ML_OBJS-y += \
 	version.o
 
 ML_SRC_OBJS = \
+	task_utils.o \
 	backtrace.o \
+	sgi.o \
+	cpu.o \
+	mmu_utils.o \
+	patch_mmu.o \
 	$(ML_BOOT_OBJ) \
 	$(ML_INIT_OBJ) \
 	fio-ml.o \
@@ -187,14 +193,9 @@ ML_SRC_OBJS = \
 	raw.o \
 	chdk-dng.o \
 	edmac-memcpy.o \
+	cache_hacks.o \
+	patch.o \
 	cache.o
-# patch.o is potentially dangerous on Digic7!
-# Triggers usage of cache_locked(), which causes Qemu to crash,
-# and may be wrong on Digic7.  The cache.o above provides the
-# same required symbol, allegedly in a less dangerous (though
-# still untested way)
-#	patch.o \
-
 
 ML_OBJS-y += $(ML_SRC_OBJS)
 
@@ -244,6 +245,10 @@ ML_SRC_REBOOT_OBJ = reboot.o \
 	disp_direct.o font_direct.o \
 	strlen.o strcmp.o gcc-libgcc.a \
 	cache.o \
+# footer.o must be the last object linked in autoexec.bin,
+# or xor_chk can fail due to unexpected global objects
+# being placed later than footer_magic
+ML_SRC_REBOOT_OBJ += \
 	footer.o
 endif
 
@@ -368,7 +373,9 @@ version.o: $(PLATFORM_DIR)/version.c
 $(PLATFORM_DIR)/version.c: FORCE
 	$(call build,"VERSION",echo "const char build_version[] = \"$(VERSION)\";") > $@
 #	@echo 'const char build_id[] = "'`hg id`'";' >> $@
-	@echo 'const char build_id[] = "'NO_HG'";' >> $@
+	@printf 'const char build_id[] = "' >> $@
+	$(BUILD_TOOLS_DIR)/git_summary.py >> $@
+	@echo '";' >> $@
 	@echo 'const char build_date[] ="'`$(DATE) "+%Y-%m-%d %H:%M:%S %Z"`'";' >> $@
 	@echo 'const char build_user[] = "'`whoami`@`hostname`'";'  >> $@
 
@@ -382,6 +389,9 @@ $(PLATFORM_DIR)/version.bin: FORCE
 	@echo 'Camera   : $(MODEL)' >> $@
 	@echo 'Firmware : $(FW_VERSION)' >> $@
 #	@echo 'Changeset: '`hg id` >> $@
+	@printf 'Commit: ' >> $@
+	$(BUILD_TOOLS_DIR)/git_summary.py >> $@
+	@echo '' >> $@
 	@echo 'Built on : '`date -u "+%Y-%m-%d %H:%M:%S"`' by '`whoami`@`hostname` >> $@
 	@echo '' >> $@
 #	@hg diff $(SRC_DIR)/ >> $@

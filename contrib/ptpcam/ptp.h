@@ -910,8 +910,6 @@ protocol version history
 2.0 - return PTP_CHDK_TYPE_TABLE for tables instead of TYPE_STRING, allow return of empty strings
 */
 
-#define PTP_OC_CHDK 0x9999
-
 // N.B.: unused parameters should be set to 0
 enum ptp_chdk_command {
   PTP_CHDK_Version = 0,     // return param1 is major version number
@@ -1018,7 +1016,7 @@ int ptp_chdk_shutdown_hard(PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_shutdown_soft(PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_reboot(PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_reboot_fw_update(char *path, PTPParams* params, PTPDeviceInfo* deviceinfo);
-char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
+void* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int ptp_chdk_call(int *args, int size, int *ret, PTPParams* params, PTPDeviceInfo* deviceinfo);
 int* ptp_chdk_get_propcase(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
@@ -1042,5 +1040,9 @@ typedef struct {
     unsigned subtype;
     char data[];
 } ptp_chdk_script_msg;
+
+int ptp_chdk_print_all_script_messages(PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char *data, unsigned size, int *status);
+void ptp_chdk_print_script_message(ptp_chdk_script_msg* msg);
 
 #endif /* __PTP_H__ */

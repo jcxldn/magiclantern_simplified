@@ -50,6 +50,10 @@ extern void platform_post_init();
 #include "fw-signature.h"
 #endif
 
+#if defined(CONFIG_MMU_EARLY_REMAP) || defined(CONFIG_MMU_REMAP)
+#include "patch.h"
+#endif
+
 static int _hold_your_horses = 1; // 0 after config is read
 int ml_started = 0; // 1 after ML is fully loaded
 int ml_gui_initialized = 0; // 1 after gui_main_task is started 
@@ -252,15 +256,15 @@ static void draw_test_pattern(int colour)
     uint8_t *b = bmp_vram();
 
     // draw a rectangle on the exact visible border
-    for (int y=30; y < 510; y++)
+    for (int y=0; y < 480; y++)
     {
-        bmp_putpixel_fast(b, 120, y, colour);
-        bmp_putpixel_fast(b, 839, y, colour);
+        bmp_putpixel_fast(b, 0, y, colour);
+        bmp_putpixel_fast(b, 719, y, colour);
     }
-    for (int x=120; x < 840; x++)
+    for (int x=0; x < 720; x++)
     {
-        bmp_putpixel_fast(b, x, 30, colour);
-        bmp_putpixel_fast(b, x, 509, colour);
+        bmp_putpixel_fast(b, x, 0, colour);
+        bmp_putpixel_fast(b, x, 479, colour);
     }
 }
 
@@ -340,8 +344,6 @@ static void hello_world()
         //DryosDebugMsg(0, 15, "display mode: %d", display_output_mode);
         DryosDebugMsg(0, 15, "colour: %d", colour);
         draw_test_pattern(colour);
-
-        bmp_fill(6, 140, 200, 40, 1);
 
         ml_refresh_display_needed = 1;
         msleep(200);
@@ -457,12 +459,18 @@ static void my_big_init_task()
     dumper_bootflag();
     return;
 #endif
-   
+
     call("DisablePowerSave");
     _ml_cbr_init();
+#ifdef CONFIG_MMU_REMAP
+    // we must do this before any code wants to apply patches,
+    // notably, modules do this
+    if (mmu_init() < 0)
+        DryosDebugMsg(0, 15, "ERROR doing mmu_init() in late context");
+#endif
     menu_init();
     debug_init();
-    call_init_funcs();
+    call_init_funcs(); // among other things, this initialises modules
     msleep(200); // leave some time for property handlers to run
 
     /**
@@ -533,9 +541,12 @@ const char* get_assert_msg() { return assert_msg; }
 
 static int my_assert_handler(char* msg, char* file, int line, int arg4)
 {
+    if (msg == NULL)
+        msg = "nullptr";
+
     uint32_t lr = read_lr();
 
-#ifdef CONFIG_DIGIC_678
+#ifdef CONFIG_DIGIC_678X
     // compiler warning on unused len
     snprintf(assert_msg, sizeof(assert_msg),
 #else
@@ -550,12 +561,12 @@ static int my_assert_handler(char* msg, char* file, int line, int arg4)
     );
 // SJE FIXME: assert handling is buggy on modern Digic.
 // Disable some of it here and do quick hack output:
-#ifdef CONFIG_DIGIC_678
+#ifdef CONFIG_DIGIC_678X
     uart_printf("[SJE] my_assert_msg: %s", assert_msg);
 #else
     backtrace_getstr(assert_msg + len, sizeof(assert_msg) - len);
-    request_crash_log(1);
 #endif
+    request_crash_log(1);
     return old_assert_handler(msg, file, line, arg4);
 }
 
@@ -571,7 +582,7 @@ void ml_assert_handler(char* msg, char* file, int line, const char* func)
     );
 // SJE FIXME: assert handling is buggy on modern Digic.
 // Disable some of it here and do quick hack output:
-#ifdef CONFIG_DIGIC_678
+#ifdef CONFIG_DIGIC_678X
     uart_printf("[SJE] ml_assert_msg: %s", assert_msg);
 #endif
     backtrace_getstr(assert_msg + len, sizeof(assert_msg) - len);
@@ -587,7 +598,18 @@ void ml_crash_message(char* msg)
 /* called before Canon's init_task */
 void boot_pre_init_task()
 {
-#if !defined(CONFIG_HELLO_WORLD) && !defined(CONFIG_DUMPER_BOOTFLAG)
+#if defined(CONFIG_HELLO_WORLD) || defined(CONFIG_DUMPER_BOOTFLAG)
+    // don't hook
+#else
+    #if defined(CONFIG_MMU_EARLY_REMAP)
+    // This only runs on one core, meaning cpu1 won't see MMU_EARLY patches.
+    // Digic 7 and 8 behave differently here and it looked like a lot of work
+    // to get D7 remapping on both cores.  This early remap so far only looks
+    // necessary for some kinds of debugging / testing work, you can remap
+    // after OS is initialised and do both cores on all cams then.
+    if (mmu_init() < 0)
+        DryosDebugMsg(0, 15, "ERROR doing mmu_init() in early context");
+    #endif
     // Install our task creation hooks
     qprint("[BOOT] installing task dispatch hook at "); qprintn((int)&task_dispatch_hook); qprint("\n");
     DryosDebugMsg(0, 15, "replacing task_dispatch_hook");

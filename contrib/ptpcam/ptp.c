@@ -26,9 +26,25 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #ifdef WIN32
 #include <winsock2.h>
+#else
+#include <unistd.h>
+#endif
+
+#ifndef UINTPTR_MAX
+    #error "No UINTPTR_MAX available, cannot safely build"
+#endif
+#if UINTPTR_MAX != 0xffffffff
+    #error "This code assumes 32-bit pointers, refusing to build."
+// This code was clearly intended for a 32-bit host, making assumptions
+// about pointer width in a few places, and packing values into buffers.
+// Is it possible to overflow buffers on cam if the host is 64-bit?
+// Looks plausible to me, so, I'm disabling such builds.
+// I might be wrong, feel free to confirm this and/or fix the code
+// to be portable.
 #endif
 
 #ifdef ENABLE_NLS
@@ -1940,14 +1956,14 @@ int ptp_chdk_reboot_fw_update(char *path, PTPParams* params, PTPDeviceInfo* devi
   return ret;
 }
 
-char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo)
+void* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo)
 {
   uint16_t ret;
   PTPContainer ptp;
   char *buf = NULL;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=3;
   ptp.Param1=PTP_CHDK_GetMemory;
   ptp.Param2=start;
@@ -1969,7 +1985,7 @@ char* ptp_chdk_gdb_upload(PTPParams* params, PTPDeviceInfo* deviceinfo)
   char *buf = NULL;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=2;
   ptp.Param1=PTP_CHDK_GDBStub_Upload;
   ptp.Param2=1024;
@@ -1990,7 +2006,7 @@ int ptp_chdk_gdb_download(char *buf, PTPParams* params, PTPDeviceInfo* deviceinf
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=2;
   ptp.Param1=PTP_CHDK_GDBStub_Download;
   ptp.Param2=strlen(buf);
@@ -2011,7 +2027,7 @@ int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo
   char *buf = (char *) &val;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=3;
   ptp.Param1=PTP_CHDK_SetMemory;
   ptp.Param2=addr;
@@ -2031,7 +2047,7 @@ int ptp_chdk_call(int *args, int size, int *ret, PTPParams* params, PTPDeviceInf
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=2;
   ptp.Param1=PTP_CHDK_CallFunction;
   ptp.Param2=size;
@@ -2070,7 +2086,7 @@ int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDevic
   int s,l;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_UploadFile;
 
@@ -2113,7 +2129,7 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
   FILE *f;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=2;
   ptp.Param1=PTP_CHDK_TempData;
   ptp.Param2=0;
@@ -2125,7 +2141,7 @@ int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDev
   }
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_DownloadFile;
 
@@ -2176,7 +2192,7 @@ int ptp_chdk_exec_lua(char *script, int get_result, PTPParams* params, PTPDevice
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=2;
   ptp.Param1=PTP_CHDK_ExecuteScript;
   ptp.Param2=PTP_CHDK_SL_LUA;
@@ -2234,7 +2250,7 @@ int ptp_chdk_get_version(PTPParams* params, PTPDeviceInfo* deviceinfo, int *majo
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_Version;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
@@ -2253,7 +2269,7 @@ int ptp_chdk_get_script_status(PTPParams* params, PTPDeviceInfo* deviceinfo, int
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_ScriptStatus;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
@@ -2271,7 +2287,7 @@ int ptp_chdk_get_script_support(PTPParams* params, PTPDeviceInfo* deviceinfo, in
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_ScriptSupport;
   r=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
@@ -2295,7 +2311,7 @@ int ptp_chdk_write_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo, char
 	return 0;
   }
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=2;
   ptp.Param1=PTP_CHDK_WriteScriptMsg;
   ptp.Param2=script_id; // TODO test don't care ?
@@ -2317,7 +2333,7 @@ int ptp_chdk_read_script_msg(PTPParams* params, PTPDeviceInfo* deviceinfo,ptp_ch
   PTPContainer ptp;
 
   PTP_CNT_INIT(ptp);
-  ptp.Code=PTP_OC_CHDK;
+  ptp.Code=PTP_OC_CANON_CHDK;
   ptp.Nparam=1;
   ptp.Param1=PTP_CHDK_ReadScriptMsg;
   char *data = NULL;
@@ -2365,7 +2381,7 @@ void ptp_chdk_print_script_message(ptp_chdk_script_msg *msg) {
   // 
   switch(msg->subtype) {
     case PTP_CHDK_TYPE_UNSUPPORTED:
-      printf("unsupported data type: ",msg->data);
+      printf("unsupported data type: %d",msg->subtype);
       fwrite(msg->data,msg->size,1,stdout); // may not be null terminated
       break;
 
