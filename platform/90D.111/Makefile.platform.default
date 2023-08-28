@@ -39,7 +39,7 @@ ROMBASEADDR     = 0xE0040000
 # we run code from this address.
 #
 # user_mem end is XXXXXXX on 90D 1.1.1
-#RESTARTSTART    = 0x002418c0
+RESTARTSTART    = 0x002418c0 # sourced from 850D
 
 # Cortex A9, binaries loaded as Thumb
 PLATFORM_ARCH = armv7-a
