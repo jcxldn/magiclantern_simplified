@@ -317,7 +317,7 @@ SIZE_CHECK_STRUCT( prop_lens_static_data, 0x180 );
 SIZE_CHECK_STRUCT( prop_lens_static_data, 0x184 );
 #endif // size check M50, R, RP, 250D
 
-#elif defined(CONFIG_850D) || defined(CONFIG_R6) || defined(CONFIG_R5)
+#elif defined(CONFIG_850D) || defined(CONFIG_90D) || defined(CONFIG_R6) || defined(CONFIG_R5)
 /* new struct variant reorders some fields as compared to previous
  * thus making a separate definition */
 struct prop_lens_static_data
@@ -420,7 +420,7 @@ struct prop_lens_dynamic_data {
         uint16_t                AVMAX;            // ShootingInfoEx: avmax
 #if !defined(CONFIG_M50)
         uint16_t                AVD;              // Not referenced in M50
-#if defined(CONFIG_850D) || defined(CONFIG_R6)  || defined(CONFIG_R5)
+#if defined(CONFIG_850D) || defined(CONFIG_90D) || defined(CONFIG_R6)  || defined(CONFIG_R5)
         uint16_t                NowAvRF;          // Referenced 850D, R6
 #endif
         uint16_t                NowAvEF;          // Not referenced in M50. Before 850D named just NowAv
@@ -504,7 +504,7 @@ struct prop_lens_dynamic_data {
 
 #if defined(CONFIG_R5) || defined(CONFIG_R6)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x94 );
-#elif defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_850D)
+#elif defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_850D) || defined(CONFIG_90D)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x90);
 #elif defined(CONFIG_250D) || defined(CONFIG_SX740)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x8C);
