@@ -33,7 +33,9 @@
     THUMB_FN(0xe05cd190,  bzero32)                /* zeros out a data structure  MFD:UPDATED WITH NEW VALUE*/
     THUMB_FN(0xe0363018,  create_init_task)       /* low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
     THUMB_FN(0xe0040236,  init_task)              /* USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc  MFD: PROBABLY SAME*/
-    THUMB_FN(0xe05cbe00,  dcache_clean)           /* loop with MCR p15 c7,c10,1; DSB   MFD: UPDATED WITH NEW VALUE */
+    THUMB_FN(0xe05cbd9c,  dcache_clean)           /* loop with MCR p15 c7,c10,1; DSB */
+        // Let's use e05cbd9c, that's the one called by firmware_entry, which is what 850d uses.
+        // They do look the same though.
     THUMB_FN(0xe05cbe70,  icache_invalidate)      /* loop with MCR p15 c7,c5,1; c7,c1,6; c7,c1,0; ISB   MFD:UPDATED WITH NEW VALUE*/
 
 /** Tasks **/
@@ -50,7 +52,7 @@
     THUMB_FN(0xe018c13c,  malloc_info)            /* Malloc Information MFD: UPDATED WITH POSSIBLE ENTRY */
     THUMB_FN(0xe018c1d4,  sysmem_info)            /* System Memory Information MFD: UPDATED WITH POSSIBLE ENTRY */
     THUMB_FN(0xe017f194,  memmap_info)            /* Exception vector, DRYOS system memory etc   MFD: UPDATED WITH POSSIBLE ENTRY */
-    THUMB_FN(0xe011c2e8,  smemShowFix)            /* Common Lower, Common Upper etc MFD: Probably not exist */
+    THUMB_FN(0xe011bbb0,  smemShowFix)            /* Common Lower, Common Upper etc */
 
 /** Memory allocation **/
     THUMB_FN(0xe05bcd74, _AllocateMemory)      /*MFD: UPDATED WITH POSSIBLE ENTRY */
@@ -155,9 +157,9 @@
     DATA_PTR(    0x02354930,  mpu_recv_cbr) // search for Direct Refs to mpu_recv address, function pointer should be found, //MFD: UPDATED WITH POSSIBLE value
                                         // find the function that uses it, which stores it; address where stored is mpu_recv_cbr
     DATA_PTR(   0x76160,  mpu_send_ring_buffer)      // ring buffer used in mpu_send //MFD: UPDATED WITH POSSIBLE value
-    DATA_PTR(    0xaf98,  mpu_send_ring_buffer_tail) // ring buffer index incremented in mpu_send MFD: same
+    DATA_PTR( 0x2354924,  mpu_send_ring_buffer_tail) // ring buffer index incremented in mpu_send
     DATA_PTR(   0x76020,  mpu_recv_ring_buffer)      // ring buffer used in SIO3_ISR, subroutine that processes two chars at a time //MFD: UPDATED WITH POSSIBLE
-    DATA_PTR(    0xafb0,  mpu_recv_ring_buffer_tail) // ring buffer index incremented in the above subroutine //MFD: UPDATED WITH POSSIBLE value
+    DATA_PTR( 0x235493c,  mpu_recv_ring_buffer_tail) // ring buffer index incremented in the above subroutine
 
 /** Misc **/
     THUMB_FN(0xe0069bf8,  vsnprintf)              /* called near dmstart; references "01234567", "0123456789", "0123456789abcdef" MFD: UPDATED WITH POSSIBLE ENTRY
@@ -178,9 +180,9 @@
     NSTUB(    0x0234e5c4,  dm_names) // in DebugMsg, before the 1st loop target //MFD: updated with possible entry
     NSTUB(   0x0235e09c,  sd_device) // in sdReadBlk, probably 0xe02b6fa2.  Lots of refs //MFD: updated with possible entry
                                   // to 0x1fd7c, some to 0x1fd80
-    NSTUB(    0x53ec,  gui_main_struct) // See function using "Queue Clear event" string, e00c55b6
-                                        // There's a base of struct, and some refs to fields via offsets.
-                                        // Find the right one.
+    NSTUB(    0x234e8ec,  gui_main_struct) // See function using "Queue Clear event" string, e020bae8
+                                           // There's a base of struct, and some refs to fields via offsets.
+                                           // Find the right one.
 //THUMB_FN(0xe00c54ab,  GUI_ChangeMode) // "GUI_ChangeMode:%d" string
     THUMB_FN(0xe0592018,  DispSensorStart) // 0x86f4 looks to be a bool for whether Sensor is started  //MFD: REPLACED WITH POSSIBLE Entry
     THUMB_FN(0xe05bb740,  DeleteMemorySuite)   //MFD: REPLACED WITH POSSIBLE Entry
@@ -225,11 +227,11 @@
                                         // the equiv of which is 0xdf00b114 (and was easier to find) MDF: REPLACED WITH POSSIBLE ENTRY
     THUMB_FN(0xe05bdea8,  prop_deliver) // used near "UNKNOWN PROPERTY ID " in call to DryosDebugMsg   MDF: REPLACED WITH POSSIBLE ENTRY
     THUMB_FN(0xe05bd9b2,  prop_register_slave)   //MFD: REPLACED WITH POSSIBLE Entry
-    DATA_PTR(0xeb80,      LiveViewApp_dialog) // in StartLiveViewApp()
-    THUMB_FN(0xe04518e8,  LiveViewApp_handler) // DebugMsg: "StartLiveViewApp(%#x)", address passed to CreateDialogBox MFD: REPLACED WITH POSSIBLE Entry
+    DATA_PTR( 0x23585b4,  LiveViewApp_dialog) // in StartLiveViewApp()
+    THUMB_FN(0xe044ffae,  LiveViewApp_handler) // DebugMsg: "StartLiveViewApp(%#x)", address passed to CreateDialogBox
     THUMB_FN(0xe07a3bd0,  LiveViewShutterApp_handler) // DebugMsg: "StartLiveViewShutterApp", address passed to CreateDialogBox  MFD: REPLACED WITH POSSIBLE Entry
-    THUMB_FN(0xe032c6c0,  PlayMovieGuideApp_handler) // "PlayMovieGuide_Start"    MFD: REPLACED WITH POSSIBLE Entry
-    THUMB_FN(0xe0561afa,  PlayMain_handler) // DebugMsg: "StartPlayMain", address passed to CreateDialogBox  MFD: REPLACED WITH POSSIBLE Entry low confidence. code is quite different
+    THUMB_FN(0xe032c392,  PlayMovieGuideApp_handler) // "PlayMovieGuide_Start"
+    THUMB_FN(0xe0560144,  PlayMain_handler) // DebugMsg: "StartPlayMain", address passed to CreateDialogBox
     THUMB_FN(0xe0704a2e,  ShootOlcApp_handler) // near "StopShootOlcApp PopPalette(%d)" MFD: REPLACED WITH POSSIBLE Entry
     THUMB_FN(0xe08dd04e,  GetCFnData) // "GetCFnData" Function sig is different but the body looks similar.  MFD: REPLACED WITH POSSIBLE Entry
                                       // Looks like the inner functions use registers the outer doesn't, which confuses Ghidra
@@ -264,7 +266,7 @@ THUMB_FN(0x0,  fsuDecodePartitionTable)
                                   // Seems to always be "idle" task.
                                   // (we don't use this, but instead calculate it during early init,
                                   //  to save backporting this stub for all older cams)
-    NSTUB(    0x4108,  task_max)
+    NSTUB( 0x234d67c,  task_max)
     NSTUB(    0x0235b190,  gui_task_list) // Strings have changed or been removed compared to earlier cams.  //MDF: REPLACED WITH POSSIBLE ENTRY
                                        // Found via checking all call sites of CreateRecursiveLock()
                                        // and comparing with 200d until similar code found.
@@ -310,7 +312,7 @@ THUMB_FN(0x0,  fsuDecodePartitionTable)
                                     // you can see fd70 + 0x14, 0x18, 0x1c being used to see which vram buffer
                                     // is active, or ready maybe.
 
-    DATA_PTR(  0x116f0,  _rgb_vram_info) // Used in many places, written to in "InitializeScreen"
+    DATA_PTR( 0x235b2bc,  _rgb_vram_info) // Used in many places, written to in "InitializeScreen"
                                          // At least for 200D, this is BGRA buffer, earlier in the render
                                          // chain than the YUV ones.  But, changes made to it will not
                                          // render until a refresh occurs (can manually trigger via RefreshVrmsSurface()),
@@ -320,7 +322,7 @@ THUMB_FN(0x0,  fsuDecodePartitionTable)
     NSTUB(0x0,  LCD_Palette) // Not required / changed in D8
                              // FIXME - presumably we should stop using this stub in source?
 
-    DATA_PTR(    0x4144,  task_dispatch_hook) // find usage in 200D, trace up call hierarchy to task_create,
+    DATA_PTR( 0x234d6b8,  task_dispatch_hook) // find usage in 200D, trace up call hierarchy to task_create,
                                               // trace back down same hierarchy in 850D
     THUMB_FN(0xe05bda80, _prop_request_change)  //MFD: REPLACED WITH POSSIBLE Entry
     THUMB_FN(0xe05cc7de,  dm_set_store_level) // called by "dmstore"
@@ -342,4 +344,4 @@ THUMB_FN(0xDFFE8EA0,  dcache_clean_multicore) /* loop writing to c11007b0, calle
 #================================================================
 # Anything below here is not required, but useful during dev work
 
-THUMB_FN(0xe05aa0c6, dumpf);  //  MFD: REPLACED WITH POSSIBLE Entry
+THUMB_FN(0xe05ccda8,  dumpf);
