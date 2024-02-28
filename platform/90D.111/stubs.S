@@ -331,6 +331,14 @@ THUMB_FN(0x0,  fsuDecodePartitionTable)
     THUMB_FN(0xe00b08dc,  task_trampoline)   //  MFD: REPLACED WITH POSSIBLE Entry
 
 
+//JC: not validated
+ARM32_FN(0xe00177ac,  memcpy_dryos) // useful in early contexts when we don't have
+                                    // dietlibc or newlib, and can't use stdio memcpy64 because
+                                    // that wants ML assert handling initialised.
+
+THUMB_FN(0xDFFE8EA0,  dcache_clean_multicore) /* loop writing to c11007b0, called after dcache_clean by copy_mmu_tables() */
+
+
 #================================================================
 # Anything below here is not required, but useful during dev work
 
