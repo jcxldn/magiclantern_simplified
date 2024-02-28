@@ -65,7 +65,7 @@ THUMB_FN(0xe05bc81e, _free_dma_memory)			/*MFD: UPDATED WITH POSSIBLE ENTRY */
 #THUMB_FN(0xE0693B5B,  free)
 
 /** Debug messages **/
-THUMB_FN(0xe05cc3e4,  DryosDebugMsg)  /* /*MFD: UPDATED WITH POSSIBLE ENTRY  lots of debug messages; format string is third argument */
+THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* (JC CONFIRMED) lots of debug messages; format string is third argument */
 
 /** DMA **/
 THUMB_FN(0xe05f73a2,  dma_memcpy)  /*MFD: UPDATED WITH POSSIBLE ENTRY */
