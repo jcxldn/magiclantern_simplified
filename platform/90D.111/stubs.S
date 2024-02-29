@@ -32,7 +32,7 @@ NSTUB(ROMBASEADDR, firmware_entry)
 THUMB_FN(0xe0040104,  cstart) /* calls bzero32 and create_init_task(..., init_task, ...)  MFD: PROBABLY SAME */
 THUMB_FN(0xe05cd190,  bzero32)/* zeros out a data structure  MFD:UPDATED WITH NEW VALUE*/
 THUMB_FN(0xe0363018,  create_init_task)   /* low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
-THUMB_FN(0xe0040236,  init_task)  /* USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc  MFD: PROBABLY SAME*/
+THUMB_FN(0xe0040236,  init_task)  /* (Confirmed): USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc*/
 THUMB_FN(0xe05cbd9c,  dcache_clean)   /* loop with MCR p15 c7,c10,1; DSB */
 // Let's use e05cbd9c, that's the one called by firmware_entry, which is what 850d uses.
 // They do look the same though.
@@ -46,13 +46,13 @@ DATA_PTR(0x1028,  current_task)   /* from task_create; pointer to the current ta
 DATA_PTR(0x1010,  current_interrupt)  /* from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
 
 /** Dumper **/
-THUMB_FN(0xe0222804,  dump_file)  /* MFD:UPDATED WITH NEW VALUE tries to save a file to either "A:/%s" or "B:/%s"; calls FIO_RemoveFile/CreateFile/WriteFile/CloseFile/Flush MFD: UPDATED WITH NEW VALUE**/
+THUMB_FN(0xe0222804,  dump_file)  /* (Confirmed): tries to save a file to either "A:/%s" or "B:/%s"; calls FIO_RemoveFile/CreateFile/WriteFile/CloseFile/Flush MFD: UPDATED WITH NEW VALUE**/
 
 /** Memory info **/
-THUMB_FN(0xe018c13c,  malloc_info)/* Malloc Information MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe018c1d4,  sysmem_info)/* System Memory Information MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe017f194,  memmap_info)/* Exception vector, DRYOS system memory etc   MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe011bbb0,  smemShowFix)/* Common Lower, Common Upper etc */
+THUMB_FN(0xe018c13c,  malloc_info)/* (Confirmed): Malloc Information */
+THUMB_FN(0xe018c1d4,  sysmem_info)/* (Confirmed): System Memory Information */
+THUMB_FN(0xe017f194,  memmap_info)/* (Confirmed): Exception vector, DRYOS system memory etc */
+THUMB_FN(0xe011bbb0,  smemShowFix)/* (Confirmed): Common Lower, Common Upper etc */
 
 /** Memory allocation **/
 THUMB_FN(0xe05bcd74, _AllocateMemory)  /*MFD: UPDATED WITH POSSIBLE ENTRY */
@@ -65,7 +65,7 @@ THUMB_FN(0xe05bc81e, _free_dma_memory)			/*MFD: UPDATED WITH POSSIBLE ENTRY */
 #THUMB_FN(0xE0693B5B,  free)
 
 /** Debug messages **/
-THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* (JC CONFIRMED) lots of debug messages; format string is third argument */
+THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* (Confirmed) lots of debug messages; format string is third argument */
 
 /** DMA **/
 THUMB_FN(0xe05f73a2,  dma_memcpy)  /*MFD: UPDATED WITH POSSIBLE ENTRY */
