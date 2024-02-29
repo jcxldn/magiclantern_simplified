@@ -66,7 +66,6 @@ int wait_for_cpu1_to_suspend(int32_t timeout)
     return 0;
 }
 
-extern void change_mmu_tables(uint8_t *ttbr0, uint8_t *ttbr1, uint32_t cpu_id);
 void suspend_cpu1_then_update_mmu(void)
 {
     uint32_t cpu_id = get_cpu_id();
@@ -75,7 +74,7 @@ void suspend_cpu1_then_update_mmu(void)
     if (sgi_wake_handler_index == 0)
         return; // refuse to sleep cpu1 if there's no mechanism to wake it
 
-    uint32_t cpu_mmu_offset = MMU_TABLE_SIZE - 0x100 + cpu_id * 0x80;
+    uint32_t cpu_mmu_offset = MMU_L1_TABLE_SIZE - 0x100 + cpu_id * 0x80;
 
     qprintf("CPU1 sleeping");
     uint32_t old_int = cli();
@@ -88,8 +87,8 @@ void suspend_cpu1_then_update_mmu(void)
     qprintf("CPU1 awoke");
 
     // update TTBRs (this DryOS function also triggers TLBIALL)
-    change_mmu_tables(mmu_conf.L1_table + cpu_mmu_offset,
-                      mmu_conf.L1_table,
+    change_mmu_tables(global_mmu_conf.L1_table + cpu_mmu_offset,
+                      global_mmu_conf.L1_table,
                       cpu_id);
 
     sgi_wake_pending = 0;

@@ -61,6 +61,17 @@ int y_times_BMPPITCH_cache[BMP_H_PLUS - BMP_H_MINUS];
 
 static void vram_update_luts()
 {
+    static int prev_bm2lv_tx = 0;
+    static int prev_bm2lv_sx = 0;
+    if (bm2lv.tx == prev_bm2lv_tx &&
+        bm2lv.sx == prev_bm2lv_sx)
+    {
+        /* unchanged */
+        return;
+    }
+    prev_bm2lv_tx = bm2lv.tx;
+    prev_bm2lv_sx = bm2lv.sx;
+
     for (int x = BMP_W_MINUS; x < BMP_W_PLUS; x++) 
     {
         bm2lv_x_cache[x - BMP_W_MINUS] = BM2LV_Xu(x);
@@ -407,7 +418,7 @@ void _update_vram_params()
     bm2lv.sy = 1024 * vram_lv.height / (480-52);
     bm2lv.tx = 0;
     bm2lv.ty = -26;
-#elif CONFIG_40D
+#elif defined(CONFIG_40D) // FIXME gcc 12 has elifdef: we can make this nicer when that's the minimum required
     bm2lv.sx = 1024 * vram_lv.width / 720;
     bm2lv.sy = 1024 * vram_lv.height / 480;
     //~ bm2lv.sy = 1024 * vram_lv.height / (480-48);    

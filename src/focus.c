@@ -93,6 +93,7 @@ int is_follow_focus_active()
     if (!follow_focus) return 0;
     if (!lv) return 0;
     if (is_manual_focus()) return 0;
+    if (is_continuous_af()) return 0;
     if (!liveview_display_idle()) return 0;
     if (gui_menu_shown()) return 0;
 #ifdef FEATURE_LCD_SENSOR_SHORTCUTS
@@ -897,6 +898,13 @@ int is_manual_focus()
     return (af_mode & 0xF) == AF_MODE_MANUAL_FOCUS;
 }
 
+int is_continuous_af()
+{
+    if (!lv) return 0;
+    if (is_manual_focus()) return 0;
+    return is_movie_mode() ? continuous_af_movie : continuous_af_photo;
+}
+
 #if defined(FEATURE_TRAP_FOCUS) || defined(FEATURE_MAGIC_ZOOM)
 static int trap_focus_autoscaling = 1;
 #endif
@@ -913,13 +921,13 @@ int handle_trap_focus(struct event * event)
 }
 #endif
 
-static int focus_graph_dirty = 0;
 
 // 70D unfortunately has no LV_FOCUS_DATA property. This explains why
 // focus confirmation bars in magic Zoom wouldn't work. See also:
 // http://www.magiclantern.fm/forum/index.php?topic=14309.msg147257#msg147257
 // we also need to disable the focus misc task to cleanup debugmsg logs
 #if !defined(CONFIG_70D)
+static int focus_graph_dirty = 0;
 #if defined(FEATURE_TRAP_FOCUS) || defined(FEATURE_MAGIC_ZOOM)
 
 #define NMAGS 64
@@ -1118,7 +1126,7 @@ static struct menu_entry focus_menu[] = {
         .priv = &follow_focus,
         .update    = follow_focus_print,
         .max = 1,
-        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS,
+        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS | DEP_NOT_CONTINUOUS_AF,
         .works_best_in = DEP_CFN_AF_BACK_BUTTON,
         .help = "Focus with arrow keys. MENU while REC = save focus point.",
 
@@ -1145,7 +1153,7 @@ static struct menu_entry focus_menu[] = {
         .icon_type = IT_BOOL,
         .edit_mode = EM_SHOW_LIVEVIEW,
         .help = "[Q]: fix here rack end point. SET+L/R: start point.",
-        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS,
+        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS | DEP_NOT_CONTINUOUS_AF,
     },
     {
         .name = "Rack Focus",
@@ -1153,7 +1161,7 @@ static struct menu_entry focus_menu[] = {
         .select     = rack_focus_start_delayed,
         .icon_type = IT_ACTION,
         .help = "Press SET for rack focus, or PLAY to also start recording.",
-        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS,
+        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS | DEP_NOT_CONTINUOUS_AF,
         .works_best_in = DEP_MOVIE_MODE,
     },
     #endif
@@ -1162,7 +1170,7 @@ static struct menu_entry focus_menu[] = {
         .name = "Focus Stacking",
         .select = menu_open_submenu,
         .help = "Takes pictures at different focus points.",
-        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS | DEP_PHOTO_MODE,
+        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS | DEP_PHOTO_MODE | DEP_NOT_CONTINUOUS_AF,
         .children =  (struct menu_entry[]) {
             {
                 .name = "Run focus stack",
@@ -1231,7 +1239,7 @@ static struct menu_entry focus_menu[] = {
         .name = "Focus Settings",
         .select     = menu_open_submenu,
         .help = "Tuning parameters and prefs for rack/stack/follow focus.",
-        .depends_on = DEP_LIVEVIEW,
+        .depends_on = DEP_LIVEVIEW | DEP_AUTOFOCUS | DEP_NOT_CONTINUOUS_AF,
         .children =  (struct menu_entry[]) {
             {
                 .name = "Step Size",
@@ -1343,6 +1351,7 @@ int handle_follow_focus_save_restore(struct event * event)
 {
     if (!lv) return 1;
     if (is_manual_focus()) return 1;
+    if (is_continuous_af()) return 1;
 
     if (RECORDING && !gui_menu_shown())
     {
@@ -1369,6 +1378,7 @@ int handle_rack_focus_menu_overrides(struct event * event)
 #ifdef FEATURE_RACK_FOCUS
     if (!lv) return 1;
     if (is_manual_focus()) return 1;
+    if (is_continuous_af()) return 1;
     if (!should_override_zoom_buttons()) return 1;
     
     if (gui_menu_shown() && is_menu_active("Focus"))
@@ -1444,7 +1454,6 @@ int handle_follow_focus(struct event * event)
                     return 1;
             }
         }
-        else lens_focus_stop();
     }
     return 1;
 }

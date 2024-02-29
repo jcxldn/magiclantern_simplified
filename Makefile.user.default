@@ -176,7 +176,7 @@ CCACHE=ccache
 GREP=grep
 MV=mv
 AWK=awk
-PYTHON=python2
+PYTHON=python3
 PYTHON3=python3
 RST2LATEX=rst2latex.py
 
@@ -233,3 +233,14 @@ CONFIG_QEMU         = n
 
 # Work in progress - load ML as position-independent code (PIC)
 CONFIG_PIC          = n
+
+
+
+# enable to save preprocessed C files (*.i)
+# this applies to modules as well (but CONFIG entries are not)
+PREPRO              = n
+
+# enable to turn off things not understood by pycparser
+# for static analysis only; do not execute the resulting code!
+# this applies to modules as well (but CONFIG entries are not)
+PYCPARSER           = n

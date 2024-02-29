@@ -128,7 +128,7 @@ int GetFreeMemForMalloc()
 // where we don't return the real start of the block,
 // but later need to know it to use free_aligned()
 // with the returned pointer.
-struct alloc_str
+struct aligned_alloc
 {
     uint32_t start;
     uint32_t len;
@@ -136,7 +136,7 @@ struct alloc_str
 // Because we need to track them, and because aligned allocs
 // can be much less space efficient, limit these to a small number.
 #define MAX_ALIGNED_ALLOCS 16
-static struct alloc_str aligned_allocs[MAX_ALIGNED_ALLOCS] = {{0, 0}};
+static struct aligned_alloc aligned_allocs[MAX_ALIGNED_ALLOCS] = {{0, 0}};
 static uint32_t alloc_count = 0;
 
 // As malloc(), but takes an alignment.  The returned pointer
@@ -315,7 +315,8 @@ static struct mem_allocator allocators[] = {
         .is_preferred_for_temporary_space = 2,  /* prefer not to use it, use shoot_malloc if you can */
 
         /* only use it for huge buffers */
-        .minimum_alloc_size = 20 * 1024 * 1024,
+        .preferred_min_alloc_size = 20 * 1024 * 1024,
+        .minimum_alloc_size = 1024 * 1024,
     },
 #endif
 #endif  /* CONFIG_INSTALLER */
@@ -810,7 +811,7 @@ static int search_for_allocator(int size, int require_preferred_size, int requir
                 )
            ))
         {
-            dbg_printf("%s: free space mismatch (req=%d,free=%d,pref=%d,min=%d)\n", allocators[a].name, size, free_space, allocators[a].preferred_free_space, allocators[a].minimum_free_space);
+            dbg_printf("%s: free space mismatch (req=%d,free=%d,pref=%d,min=%d,maxrgn=%d)\n", allocators[a].name, size, free_space, allocators[a].preferred_free_space, allocators[a].minimum_free_space, allocators[a].get_max_region ? allocators[a].get_max_region() : -1);
             continue;
         }
         
@@ -823,12 +824,16 @@ static int search_for_allocator(int size, int require_preferred_size, int requir
             continue;
         }
         
-        /* if this allocator requires malloc for its internal data structures,
+        /* if this allocator requires malloc/AllocateMemory for its internal data structures,
          * do we have enough free space there? (if not, we risk ERR70) */
-        if (allocators[a].depends_on_malloc && GetFreeMemForMalloc() < 8*1024)
+        if (allocators[a].depends_on_malloc)
         {
-            dbg_printf("%s: not enough space for malloc (%d)\n", allocators[a].name, GetFreeMemForMalloc());
-            continue;
+            if (GetFreeMemForMalloc() < 16 * 1024 ||           /* FIXME: implement GetMaxRegionForMalloc */
+                GetMaxRegionForAllocateMemory() < 16 * 1024)
+            {
+                dbg_printf("%s: not enough space for malloc (%d)\n", allocators[a].name, GetFreeMemForMalloc());
+                continue;
+            }
         }
         
         /* yes, we do! */
@@ -1000,6 +1005,7 @@ void shoot_free_suite(struct memSuite * hSuite)
     give_semaphore(mem_sem);
 }
 
+#ifndef CONFIG_MEMORY_SRM_NOT_WORKING
 struct memSuite * srm_malloc_suite(int num_requested_buffers)
 {
     take_semaphore(mem_sem, 0);
@@ -1014,6 +1020,7 @@ void srm_free_suite(struct memSuite * suite)
     _srm_free_suite(suite);
     give_semaphore(mem_sem);
 }
+#endif // ~CONFIG_MEMORY_SRM_NOT_WORKING
 
 struct memSuite * shoot_malloc_suite_contig(size_t size)
 {
@@ -1165,6 +1172,7 @@ static void guess_free_mem_task(void *priv, int delta)
     exmem_clear(shoot_suite, 0);
     _shoot_free_suite(shoot_suite);
 
+#ifndef CONFIG_MEMORY_SRM_NOT_WORKING
     /* test the new SRM job allocator */
     struct memSuite *srm_suite = _srm_malloc_suite(0);
     
@@ -1207,6 +1215,7 @@ static void guess_free_mem_task(void *priv, int delta)
 
     exmem_clear(srm_suite, 0);
     _srm_free_suite(srm_suite);
+#endif // ~CONFIG_MEMORY_SRM_NOT_WORKING
 
     /* mallocs can resume now */
     give_semaphore(mem_sem);

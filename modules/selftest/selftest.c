@@ -599,12 +599,15 @@ static void stub_test_file_io()
     uint32_t size;
     TEST_FUNC_CHECK(FIO_GetFileSize("test.dat", &size), == 0);
     TEST_FUNC_CHECK(size, == 0x20000);
-    void* p;
-    TEST_FUNC_CHECK(p = (void*)_alloc_dma_memory(0x20000), != 0);
-    TEST_FUNC_CHECK(f = FIO_OpenFile("test.dat", O_RDONLY | O_SYNC), != 0);
-    TEST_FUNC_CHECK(FIO_ReadFile(f, p, 0x20000), == 0x20000);
+    void *p = NULL;
+    TEST_FUNC_CHECK(p = (void*)fio_malloc(0x20000), != 0);
+    if (p) {
+        TEST_FUNC_CHECK(f = FIO_OpenFile("test.dat", O_RDONLY | O_SYNC), != 0);
+        TEST_FUNC_CHECK(FIO_ReadFile(f, p, 0x20000), == 0x20000);
+    }
+
     TEST_VOID(FIO_CloseFile(f));
-    TEST_VOID(_free_dma_memory(p));
+    TEST_VOID(fio_free(p));
 
     {
         int count = 0;
@@ -666,6 +669,13 @@ static void stub_test_file_io()
     TEST_FUNC_CHECK(is_file("test.dat"), == 0);
 }
 
+/* microsecond timer wraps around at 1048576 */
+static int DeltaT(int a, int b)
+{
+    return MOD(a - b, 1048576);
+}
+
+
 static void stub_test_gui_timers()
 {
     /* GUI timers */
@@ -701,12 +711,6 @@ static void stub_test_gui_timers()
         TEST_FUNC_CHECK(timer_func, == 0);  /* ta0 + 1500 => CBR should be not be called, and we'll cancel it early */
         TEST_VOID(msleep(1500));
         TEST_FUNC_CHECK(timer_func, == 0);  /* ta0 + 3000 => CBR should be not be called, because it was canceled */
-    }
-    
-    /* microsecond timer wraps around at 1048576 */
-    int DeltaT(int a, int b)
-    {
-        return MOD(a - b, 1048576);
     }
 
     /* SetHPTimerNextTick, SetHPTimerAfterTimeout, SetHPTimerAfterNow */
@@ -1187,6 +1191,187 @@ static void stub_test_task(void* arg)
     stub_test_save_log();
     fio_free(stub_log_buf);
     stub_log_buf = 0;
+}
+
+static volatile int threading_errors = 0;
+
+static void nop_test(int task_id)
+{
+    for (volatile int x = 0; x < 20000000; x++)
+    {
+        asm("nop");
+    }
+}
+
+static void puts_test()
+{
+    puts(get_current_task_name());
+}
+
+static void rtc_test(int task_id)
+{
+    struct tm now;
+    LoadCalendarFromRTC(&now);
+#if 0
+    printf(
+        "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+        "%d: %04d/%02d/%02d %02d:%02d:%02d",
+        task_id,
+        now.tm_year + 1900,
+        now.tm_mon + 1,
+        now.tm_mday,
+        now.tm_hour,
+        now.tm_min,
+        now.tm_sec
+    );
+#endif
+}
+
+static void lens_format_dist_test(int task_id)
+{
+    int dist = (task_id == 1) ? 1234 : 567;
+    const char * expected = 
+        (task_id == 1) ? "1.23" SYM_SMALL_M
+                       : "56" SYM_SMALL_C SYM_SMALL_M ;
+
+    /* this should fail, as it's not thread-safe */
+    const char * dist_str = lens_format_dist(dist);
+    threading_errors += !streq(dist_str, expected);
+}
+
+static void pause_lv_test(int task_id)
+{
+    PauseLiveView();
+    ResumeLiveView();
+}
+
+static volatile int tests_running = 0;
+static volatile int calls_per_task[2];
+static volatile int switched_calls[2];
+static volatile int switched_contexts[2];
+
+/* DryOS tasks with identical priority appear to never interrupt each other,
+ * unless each task voluntarily yields somehow (msleep, take_semaphore,
+ * msg_queue_receive, event flags etc).
+ * 
+ * Tasks with higher priority will always interrupt a lower-priority one,
+ * even if the latter never yields.
+ */
+
+/* define this to test the behavior of DryOS tasks with identical priority */
+#undef TEST_EQUAL_PRIO
+
+static void DUMP_ASM test_loop(void (*func)(int))
+{
+    tests_running++;
+    int id = get_current_task_name()[0] - 'A';
+
+    /* task 1 (higher priority) will start later, to interrupt task 0 */
+    msleep(id ? 300 : 200);
+
+    int t0 = get_ms_clock();
+    while (get_ms_clock() - t0 < 500)
+    {
+        /* assume there are 2 tasks running, with IDs 0 and 1 */
+        /* record how many times the other task ran during our test function */
+        int c0 = calls_per_task[!id];
+
+        /* call the tested function */
+        func(id);
+
+        /* update stats */
+        int c1 = calls_per_task[!id];
+        switched_contexts[id] += (c1 - c0);
+        switched_calls[id] += (c1 != c0);
+        calls_per_task[id]++;
+
+#if !defined(TEST_EQUAL_PRIO)
+        /* task 1 has higher priority, so it will never be interrupted by task 0 */
+        /* unless we call msleep or some other waiting function (sem, mq, event) */
+        if (id)
+        {
+            msleep(rand() % 20);
+        }
+#endif
+    }
+
+    tests_running--;
+}
+
+static void test_2_tasks(char * func_name, void (*func)(int))
+{
+    printf("\n%s ", func_name);
+
+    /* reset stats */
+    switched_calls[0] = switched_calls[1] = 0;
+    calls_per_task[0] = calls_per_task[1] = 0;
+    switched_contexts[0] = switched_contexts[1] = 0;
+    threading_errors = 0;
+
+    for (int k = 0; k < 5 && !threading_errors; k++)
+    {
+        /* note: the main test task is started with priority 0x1a */
+
+#if defined(TEST_EQUAL_PRIO)
+        /* test for tasks with equal priority */
+        task_create("A", 0x18, 0x8000, test_loop, func);
+        task_create("B", 0x18, 0x8000, test_loop, func);
+#else
+        /* task B runs with higher priority (lower number) */
+        task_create("A", 0x19, 0x8000, test_loop, func);
+        task_create("B", 0x18, 0x8000, test_loop, func);
+#endif
+
+        /* wait for the two tasks to start (tests not running yet) */
+        msleep(100);
+        ASSERT(tests_running == 2);
+
+        /* speed up DryOS timer from 10ms to 0.2ms to get more context switches */
+        /* (OK outside LiveView; very small values will result in lockup) */
+        MEM(0xC0210208) = 200;
+
+        info_led_on();
+        while (tests_running)
+        {
+            msleep(100);
+        }
+        info_led_off();
+
+        /* set DryOS timer back to 10ms */
+        MEM(0xC0210208) = 9999;
+
+        /* progress indicator */
+        printf(".");
+        msleep(500);
+    }
+
+    printf("\n");
+
+    if (threading_errors)
+    {
+        printf(" !!! %d errors !!!\n", threading_errors);
+    }
+
+    printf(
+        " %d+%d calls, %d+%d with context switched,\n"
+        " %d+%d context switches in the test function.\n",
+        calls_per_task[0], calls_per_task[1],
+        switched_calls[0], switched_calls[1],
+        switched_contexts[0], switched_contexts[1]
+    );
+}
+
+static void thread_test_task(void* arg)
+{
+    msleep(1000);
+    console_show();
+
+#ifdef TEST_EQUAL_PRIO
+    test_2_tasks("nop", nop_test);
+#endif
+    test_2_tasks("lens_format_dist", lens_format_dist_test);
+    test_2_tasks("LoadCalendarFromRTC", rtc_test);
+    test_2_tasks("PauseLiveView", pause_lv_test);
 }
 
 static void rpc_test_task(void* unused)
@@ -1755,6 +1940,16 @@ static void bmp_fill_test_task()
     }
 }
 
+static void info_screen_test_task()
+{
+    msleep(2000);
+    while(1)
+    {
+        fake_simple_button(BGMT_INFO);
+        msleep(rand() % 100);
+    }
+}
+
 #if 0
 static void menu_duplicate_test()
 {
@@ -2212,6 +2407,12 @@ static struct menu_entry selftest_menu[] =
                 .help       = "Tests Canon functions called by ML. SET=once, PLAY=100x."
             },
             {
+                .name       = "Thread safety test",
+                .select     = run_in_separate_task,
+                .priv       = thread_test_task,
+                .help       = "Tests various functions for thread safety. WIP."
+            },
+            {
                 .name       = "RPC reliability test (infinite)",
                 .select     = run_in_separate_task,
                 .priv       = rpc_test_task,
@@ -2247,6 +2448,13 @@ static struct menu_entry selftest_menu[] =
                 .select     = run_in_separate_task,
                 .priv       = bmp_fill_test_task,
                 .help       = "Stresses graphics bandwith. Run this while recording.",
+            },
+            {
+                .name       = "Info screen test (infinite)",
+                .select     = run_in_separate_task,
+                .priv       = info_screen_test_task,
+                .help       = "Switches INFO screens very quickly.",
+                .help2      = "This used to crash the 500D if the test was run while recording.",
             },
             {
                 .name       = "SRM memory test (5 minutes)",
@@ -2333,6 +2541,205 @@ static struct menu_entry selftest_menu[] =
     },
 };
 
+static int menu_vars[25] = {
+    [2] = 15,
+    [3] = 15,
+    [6] = 25,
+    [17] = 0x100,
+    [24] = 234,
+};
+
+static struct menu_entry edit_tests_menu[] =
+{
+    {
+        .name = "Menu edit tests",
+        .select = menu_open_submenu,
+        .help = "Dummy variables with various edit ranges.",
+        .children =  (struct menu_entry[]) {
+            {
+                .name = "Decimal 0..5",
+                .priv = &menu_vars[0],
+                .min = 0,
+                .max = 5,
+                .unit = UNIT_DEC,
+                .edit_mode = EM_SHOW_LIVEVIEW,
+            },
+            {
+                .name = "Decimal 0..10",
+                .priv = &menu_vars[1],
+                .min = 0,
+                .max = 10,
+                .unit = UNIT_DEC,
+                .edit_mode = EM_SHOW_LIVEVIEW,
+            },
+            {
+                .name = "Decimal 0..15",
+                .priv = &menu_vars[2],
+                .min = 1,
+                .max = 15,
+                .unit = UNIT_DEC,
+                .edit_mode = EM_SHOW_LIVEVIEW,
+            },
+            {
+                .name = "Decimal 10..20",
+                .priv = &menu_vars[3],
+                .min = 10,
+                .max = 20,
+                .unit = UNIT_DEC,
+                .edit_mode = EM_SHOW_LIVEVIEW,
+            },
+            {
+                .name = "Decimal 0..99",
+                .priv = &menu_vars[4],
+                .min = 0,
+                .max = 99,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Decimal 0..100",
+                .priv = &menu_vars[5],
+                .min = 0,
+                .max = 100,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Decimal 25..150",
+                .priv = &menu_vars[6],
+                .min = 25,
+                .max = 150,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Decimal -5..5",
+                .priv = &menu_vars[7],
+                .min = -5,
+                .max = 5,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Decimal -9..9",
+                .priv = &menu_vars[8],
+                .min = -9,
+                .max = 9,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Decimal -10..10",
+                .priv = &menu_vars[9],
+                .min = -10,
+                .max = 10,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Decimal -50..500",
+                .priv = &menu_vars[10],
+                .min = -50,
+                .max = 500,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Decimal 1..10000000",
+                .priv = &menu_vars[11],
+                .min = 1,
+                .max = 10000000,
+                .unit = UNIT_DEC,
+            },
+            {
+                .name = "Hex 0..7",
+                .priv = &menu_vars[12],
+                .min = 0,
+                .max = 0x7,
+                .unit = UNIT_HEX,
+            },
+            {
+                .name = "Hex 0..F",
+                .priv = &menu_vars[13],
+                .min = 0,
+                .max = 0xF,
+                .unit = UNIT_HEX,
+            },
+            {
+                .name = "Hex 0..FF",
+                .priv = &menu_vars[14],
+                .min = 0,
+                .max = 0xFF,
+                .unit = UNIT_HEX,
+            },
+            {
+                .name = "Hex 0..1FF",
+                .priv = &menu_vars[15],
+                .min = 0,
+                .max = 0x1FF,
+                .unit = UNIT_HEX,
+            },
+            {
+                .name = "Hex 0..3FF",
+                .priv = &menu_vars[16],
+                .min = 0,
+                .max = 0x3FF,
+                .unit = UNIT_HEX,
+            },
+            {
+                .name = "Hex 100..3FF",
+                .priv = &menu_vars[17],
+                .min = 0x100,
+                .max = 0x3FF,
+                .unit = UNIT_HEX,
+            },
+            {
+                .name = "Hex 0..FFFFFFFF",
+                .priv = &menu_vars[18],
+                .min = 0,
+                .max = 0xFFFFFFFF,
+                .unit = UNIT_HEX,
+            },
+            {
+                .name = "Time 0..10s",
+                .priv = &menu_vars[19],
+                .min = 0,
+                .max = 10,
+                .unit = UNIT_TIME,
+            },
+            {
+                .name = "Time 0..1m",
+                .priv = &menu_vars[20],
+                .min = 0,
+                .max = 60,
+                .unit = UNIT_TIME,
+            },
+            {
+                .name = "Time 0..1h",
+                .priv = &menu_vars[21],
+                .min = 0,
+                .max = 60 * 60,
+                .unit = UNIT_TIME,
+            },
+            {
+                .name = "Time 0..24h",
+                .priv = &menu_vars[22],
+                .min = 0,
+                .max = 24 * 60 * 60,
+                .unit = UNIT_TIME,
+            },
+            {
+                .name = "Time 0..500ms",
+                .priv = &menu_vars[23],
+                .min = 0,
+                .max = 500,
+                .unit = UNIT_TIME_MS,
+            },
+            {
+                .name = "Time 113..512"SYM_MICRO"s",
+                .priv = &menu_vars[24],
+                .min = 113,
+                .max = 512,
+                .unit = UNIT_TIME_US,
+            },
+            MENU_EOL,
+        },
+    },
+};
+
 static struct menu_entry * selftest_menu_entry(const char* entry_name)
 {
     /* menu entries are not yet linked, so iterate as in array, not as in linked list */
@@ -2375,6 +2782,9 @@ static unsigned int selftest_init()
     BGMT_TRASH       = module_translate_key(MODULE_KEY_TRASH,       MODULE_KEY_CANON);
     
     menu_add("Debug", selftest_menu, COUNT(selftest_menu));
+
+    /* TODO: automatic tests */
+    menu_add("Debug", edit_tests_menu, COUNT(edit_tests_menu));
     
     if (is_camera("7D", "*"))
     {

@@ -69,6 +69,8 @@
 #include <fileprefix.h>
 #include <raw.h>
 #include <patch.h>
+#include "../mlv_rec/mlv.h"
+#include "../mlv_rec/mlv_rec_interface.h"
 
 static CONFIG_INT("isoless.hdr", isoless_hdr, 0);
 static CONFIG_INT("isoless.iso", isoless_recovery_iso, 3);
@@ -774,9 +776,10 @@ static uint32_t get_photo_cmos_iso_start_550d(void)
                 continue;
 
             // we expect the next field to be the original addr
-            // before it was rounded up to meet DMA alignment
-            // (not sure on exact alignment)
-            if ((probe[6] & 0xfffff800) != (probe[7] & 0xfffff800))
+            // before it was rounded up to meet DMA alignment,
+            // which looks to be 0x100 though I'm not sure.
+            uint32_t aligned_val = probe[7] + (-probe[7] & 0xff);
+            if (probe[6] != aligned_val)
                 continue;
 
             // passed all checks, stop search
@@ -852,14 +855,13 @@ static uint32_t get_photo_cmos_iso_start_650d(void)
             // we expect the next field to be the original addr
             // before it was rounded up to meet DMA alignment
             // (0x100 aligned on this 650D version)
-            if ((probe[6] & 0xfffff800) != (probe[7] & 0xfffff800))
+            uint32_t aligned_val = probe[7] + (-probe[7] & 0xff);
+            if (probe[6] != aligned_val)
                 continue;
 
             // passed all checks, stop search
             qprintf("Found ram_copy_start, 0x%08x: 0x%08x\n",
                     &probe[6], ram_copy_start);
-            printf("r_c_s %08x: %08x\n",
-                   &probe[6], ram_copy_start);
             break;
         }
     }
@@ -923,8 +925,6 @@ static uint32_t get_photo_cmos_iso_start_200d(void)
             // passed all checks, stop search
             qprintf("Found ram_copy_start, 0x%08x: 0x%08x\n",
                     &probe[6], ram_copy_start);
-            printf("r_c_s %08x: %08x\n",
-                   &probe[6], ram_copy_start);
             break;
         }
     }
@@ -936,6 +936,24 @@ static uint32_t get_photo_cmos_iso_start_200d(void)
     }
 
     return ram_copy_start;
+}
+
+/* callback routine for mlv_rec to add a custom DISO block after recording started (which already was specified in mlv.h in definition phase) */
+static void isoless_mlv_rec_cbr (uint32_t event, void *ctx, mlv_hdr_t *hdr)
+{
+    /* construct a free-able pointer to later pass it to mlv_rec_queue_block */
+    mlv_diso_hdr_t *dual_iso_block = malloc(sizeof(mlv_diso_hdr_t));
+    
+    /* set the correct type and size */
+    mlv_set_type((mlv_hdr_t *)dual_iso_block, "DISO");
+    dual_iso_block->blockSize = sizeof(mlv_diso_hdr_t);
+    
+    /* and fill with data */
+    dual_iso_block->dualMode = dual_iso_is_active();
+    dual_iso_block->isoValue = isoless_recovery_iso;
+    
+    /* finally pass it to mlv_rec which will free the block when it has been processed */
+    mlv_rec_queue_block((mlv_hdr_t *)dual_iso_block);
 }
 
 static unsigned int isoless_init()
@@ -1108,7 +1126,9 @@ static unsigned int isoless_init()
         PHOTO_CMOS_ISO_COUNT =          6; // from ISO 100 to 3200
         PHOTO_CMOS_ISO_SIZE  =         18; // distance between ISO 100 and ISO 200 addresses, in bytes
 
-        FRAME_CMOS_ISO_START = PHOTO_CMOS_ISO_START + 0x12b0; // CMOS register 0000 - for LiveView, ISO 100 (check in movie mode, not photo!)
+        FRAME_CMOS_ISO_START = 0;
+        if (PHOTO_CMOS_ISO_START != 0)
+            FRAME_CMOS_ISO_START = PHOTO_CMOS_ISO_START + 0x12b0; // CMOS register 0000 - for LiveView, ISO 100 (check in movie mode, not photo!)
         FRAME_CMOS_ISO_COUNT =          6; // from ISO 100 to 3200
         FRAME_CMOS_ISO_SIZE  =         30; // distance between ISO 100 and ISO 200 addresses, in bytes
 
@@ -1207,7 +1227,9 @@ static unsigned int isoless_init()
         PHOTO_CMOS_ISO_COUNT =          6;
         PHOTO_CMOS_ISO_SIZE  =       0x10;
 
-        FRAME_CMOS_ISO_START = PHOTO_CMOS_ISO_START + 0x124a;
+        FRAME_CMOS_ISO_START = 0;
+        if (PHOTO_CMOS_ISO_START != 0)
+            FRAME_CMOS_ISO_START = PHOTO_CMOS_ISO_START + 0x124a;
         FRAME_CMOS_ISO_COUNT =          6;
         FRAME_CMOS_ISO_SIZE  =       0x22;
 
@@ -1280,6 +1302,9 @@ static unsigned int isoless_init()
         isoless_hdr = 0;
         return 1;
     }
+    
+    mlv_rec_register_cbr(MLV_REC_EVENT_PREPARING, &isoless_mlv_rec_cbr, NULL);
+    
     return 0;
 }
 

@@ -68,6 +68,20 @@ THUMB_FN(0xDF006E6D,  DryosDebugMsg)          /* lots of debug messages; format 
 
 /** DMA **/
 THUMB_FN(0xE01B3297,  dma_memcpy)
+//
+// The following are believed correct, though not yet tested.
+// They're left commented for now, because ML code needs these to build,
+// and we currently have safe dummy functions in function_overrides.c
+//
+// Now we have real things found, we need to check func sigs are unchanged,
+// usage, etc.  Certainly things have changed.
+//
+//THUMB_FN(0x35392, StartEDmac);
+//THUMB_FN(0x35486, edmac_set_addr);
+//THUMB_FN(0x35506, edmac_set_size);
+//THUMB_FN(0x3649c, ConnectWriteEDmac);
+//THUMB_FN(0x364f0, ConnectReadEDmac);
+//THUMB_FN(0x3678e, RegisterEDmacCompleteCBR);
 
 /** Eventprocs (call by name) **/
 THUMB_FN(0xE04BDB8F,  call)                   /* many functions called by name (lv_start, lv_stop etc) */
@@ -112,6 +126,22 @@ THUMB_FN(0xE0137001,  cli_spin_lock)          /* used in AllocateMemory/FreeMemo
 THUMB_FN(0xe0137048,  send_software_interrupt) // int 10 is used by DryOS to sleep/wake cpu1
 //THUMB_FN(0xe0004d30,  wfi_sinkhole) // used to make cpu wait for int 10
 
+THUMB_FN(   0x34b5a, _request_RPC) // allows CPU0 or CPU1 to pass a func pointer and param
+                                   // to the other for RPC.
+                                   // Passing a NULL func pointer, will suspend the other
+                                   // CPU until it becomes non-NULL.
+                                   // DryOS seems to use this to deliberately sleep a CPU
+                                   // in some exceptional cases (e.g. asserts).
+                                   //
+                                   // Don't call this directly, because if you do,
+                                   // and you forget to call clear_RPC_request(),
+                                   // the target CPU will repeatedly call the func pointer
+                                   // as fast as possible, forever.
+                                   // Instead use request_RPC().
+
+THUMB_FN(   0x34b7a,  clear_RPC_request) // reset the request to prevent calling
+                                         // the function forever
+
 /** MPU communication **/
 THUMB_FN(0xE01C7657,  mpu_send)                  // "dwSize < TXBD_DATA_SIZE"
 THUMB_FN(0xE056314F,  mpu_recv)                  // passed as last argument by InitializeIntercom and eventually stored into mpu_recv_cbr
@@ -122,7 +152,8 @@ DATA_PTR(   0x87998,  mpu_recv_ring_buffer)      // ring buffer used in SIO3_ISR
 DATA_PTR(    0x799C,  mpu_recv_ring_buffer_tail) // ring buffer index incremented in the above subroutine
 
 /** Misc **/
-THUMB_FN(0xe00764f0,  vsnprintf) // references "01234567", "0123456789", "0123456789abcdef" and "0123456789ABCDEF"; second arg is size.
+THUMB_FN(0xdf009338,  vsnprintf)
+//THUMB_FN(0xe00764f0,  vsnprintf) // references "01234567", "0123456789", "0123456789abcdef" and "0123456789ABCDEF"; second arg is size.
                                  // There's a somewhat vsnprintf-like at df009038, which only understands %s, not e.g. %x, don't use it.
                                  // There's another at e11c7cf8 which has an unusual "ERROR" string.
 
@@ -313,7 +344,7 @@ THUMB_FN(0xe0004a5a, change_mmu_tables) // Updates TTBRs and does TLB maintenanc
 THUMB_FN(0xe0013cc4, copy_mmu_tables) // copies from one location to another,
                                       // fixing up addresses held in table start,
                                       // and doing cache maintenance
-// slightly MMU related, used by CONFIG_MMU_EARLY_REMAP
+// slightly MMU related, used by CONFIG_MMU_REMAP
 ARM32_FN(0xe001654c, memcpy_dryos) // useful in early contexts when we don't have
                                    // dietlibc or newlib, and can't use stdio memcpy64 because
                                    // that wants ML assert handling initialised.
@@ -398,25 +429,8 @@ THUMB_FN(0xe07159e8, nif_setup); // initialises network interface, set_IP_addres
                                  // even if wlan_connect has already succeeded.  So I guess this is at a different layer.
                                  // wlanipset calls this for us, but that doesn't set gateway IP.
 
-
-// SJE maybe 0xe007e056 is important.  This loops doing a "DmacCh" related function, and that gets us
-// to 0x36bf0 - there's a few functions there that ref edmac related strings!
-// 
-//NSTUB(0xFF97C8D4,  SetEDmac)
-//NSTUB(0xFF97C8F0,  ConnectWriteEDmac)
-//NSTUB(0xFF97C918,  ConnectReadEDmac)
-//NSTUB(0xFF97C938,  StartEDmac)
-//NSTUB(0xFF97C9E4,  AbortEDmac)
-//NSTUB(0xFF97CA84,  RegisterEDmacCompleteCBR)
-//NSTUB(0xFF97CA98,  UnregisterEDmacCompleteCBR)
-//NSTUB(0xFF97CAAC,  RegisterEDmacAbortCBR)
-//NSTUB(0xFF97CAE4,  UnregisterEDmacAbortCBR)
-//NSTUB(0xFF97CB14,  RegisterEDmacPopCBR)
-//NSTUB(0xFF97CB28,  UnregisterEDmacPopCBR)
-//NSTUB(0xFF97D794, _EngDrvOut)
-//NSTUB(0xFF97D7F8,  shamem_read) // AJ_0x8FB0_engio_struct_n_R0_manipulation_to_get_ptr
-//NSTUB(0xFF97D904, _engio_write)
-//NSTUB(0xFFA6CE4C,  UnLockEngineResources)
+THUMB_FN(0xe00c0484,  mem_to_mem_edmac_copy)
+//THUMB_FN(0xe04b39c0,  UnLockEngineResources)
 
 // SJE couldn't find it, some other cameras don't have it, looks like
 // audio-common.c has a static array for that.

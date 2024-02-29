@@ -107,7 +107,7 @@ struct menu_display_info
                                 } while(0)
 
 #define MENU_SET_ENABLED(val)   info->enabled = (val) // whether the feature is ON or OFF
-#define MENU_SET_ICON(ico, arg)  ({ info->icon = (ico); info->icon_arg = (arg); })
+#define MENU_SET_ICON(ico, arg)  do { info->icon = (ico); info->icon_arg = (arg); } while(0)
 
 struct menu_entry;
 struct menu_display_info;
@@ -237,8 +237,8 @@ struct menu_entry
 #define UNIT_PERCENT 3
 #define UNIT_PERCENT_x10 4
 #define UNIT_ISO 5
-#define UNIT_HEX 6
-#define UNIT_DEC 7
+#define UNIT_HEX 6      /* unsigned */
+#define UNIT_DEC 7      /* signed */
 #define UNIT_TIME 8     /* seconds */
 #define UNIT_TIME_MS 9  /* milliseconds */
 #define UNIT_TIME_US 10 /* microseconds */
@@ -263,6 +263,9 @@ struct menu_entry
 
 #define DEP_SOUND_RECORDING (1<<14)
 #define DEP_NOT_SOUND_RECORDING (1<<15)
+
+#define DEP_CONTINUOUS_AF (1<<16)
+#define DEP_NOT_CONTINUOUS_AF (1<<17)
 
 struct menu
 {

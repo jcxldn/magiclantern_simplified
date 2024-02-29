@@ -49,7 +49,7 @@
 #define FOCUS_CONFIRMATION (*(int*)0x41C8) // see "focusinfo" and Wiki:Struct_Guessing
 #define HALFSHUTTER_PRESSED (*(int*)0x1b98) // used for Trap Focus and Magic Off.
 //~ #define AF_BUTTON_PRESSED_LV 0
-#define CURRENT_GUI_MODE (*(int*)0x3964) // GUIMode_maybe in Indy's IDC
+#define CURRENT_GUI_MODE (*(int*)0x3960) // GUIMode_maybe in Indy's IDC
 #define LV_BOTTOM_BAR_DISPLAYED (((*(int8_t*)0x5350) == 0xF) ||((*(int8_t*)0xCBD4) != 0x17)) // dec CancelBottomInfoDispTimer
 #define ISO_ADJUSTMENT_ACTIVE ((*(int*)0x5350) == 0xF) // dec ptpNotifyOlcInfoChanged
 #define UNAVI_FEEDBACK_TIMER_ACTIVE (MEM(0xCBD0) != 0x17) // dec CancelUnaviFeedBackTimer
@@ -127,8 +127,7 @@
 // see "Malloc Information"
 #define MALLOC_STRUCT 0x16fc8
 #define MALLOC_FREE_MEMORY (MEM(MALLOC_STRUCT + 8) - MEM(MALLOC_STRUCT + 0x1C)) // "Total Size" - "Allocated Size"
-
-//~ #define ARROW_MODE_TOGGLE_KEY ""
+#define SRM_BUFFER_SIZE 0x14E8000   /* print it from srm_malloc_cbr */
 
 // In bindGUIEventFromGUICBR, look for "LV Set" => arg0 = 8
 // Next, in SetGUIRequestMode, look at what code calls NotifyGUIEvent(8, something)

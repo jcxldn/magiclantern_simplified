@@ -2,6 +2,7 @@
 #define _module_h_
 
 #include <stdint.h>
+#include "ml-cbr.h"
 
 #define MODULE_PATH                   "ML/MODULES/"
 
@@ -147,7 +148,10 @@ typedef struct
     const char *name;
     const char *symbol;
     unsigned int type;
-    unsigned int (*handler) (unsigned int);
+    union {
+        unsigned int (*handler) (unsigned int);
+        ml_cbr_action (*named_handler) (const char *, void *);
+    };
     unsigned int ctx;
 } module_cbr_t;
 
@@ -210,12 +214,21 @@ typedef struct
 #define MODULE_STRINGS_START__(prefix,modname)                  module_strpair_t prefix##modname[] MODULE_STRINGS_SECTION = {
 #define MODULE_STRING(field,value)                                  { field, value },
 #define MODULE_STRINGS_END()                                        { (const char *)0, (const char *)0 }\
-                                                                };                                                                
-#define MODULE_CBRS_START()                                     MODULE_CBRS_START_(MODULE_CBR_PREFIX,MODULE_NAME)
+                                                                };
+
+// SJE FIXME - I spent many hours trying to work out why the following
+// throws a missing braces warning.  Barely possibly a gcc bug?
+// Can't understand why in this code, couldn't generate a simpler
+// test case that repro'd.
+// Hack: ignore the warning.  Would like to fix / remove this.
+#define MODULE_CBRS_START() \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wmissing-braces\"") \
+                                                                MODULE_CBRS_START_(MODULE_CBR_PREFIX,MODULE_NAME)
 #define MODULE_CBRS_START_(prefix,modname)                      MODULE_CBRS_START__(prefix,modname)
 #define MODULE_CBRS_START__(prefix,modname)                     module_cbr_t prefix##modname[] = {
 #define MODULE_CBR(cb_type,cbr,context)                         { .name = #cb_type, .symbol = #cbr, .type = cb_type,   .handler = cbr, .ctx = context },
-#define MODULE_NAMED_CBR(cb_name,cbr)                           { .name = cb_name,  .symbol = #cbr, .type = CBR_NAMED, .handler = (void*)cbr, .ctx = 0       },
+#define MODULE_NAMED_CBR(cb_name,cbr)                           { .name = cb_name,  .symbol = #cbr, .type = CBR_NAMED, .named_handler = cbr, .ctx = 0       },
 #define MODULE_CBRS_END()                                           { (void *)0, (void *)0, 0, (void *)0, 0 }\
                                                                 };
                                                             
@@ -224,7 +237,8 @@ typedef struct
 #define MODULE_CONFIGS_START__(prefix,modname)                  module_config_t prefix##modname[] = {
 #define MODULE_CONFIG(cfg)                                      { .name = #cfg, .ref = &__config_##cfg },
 #define MODULE_CONFIGS_END()                                        { (void *)0, (void *)0 }\
-                                                                };
+                                                                };\
+    _Pragma("GCC diagnostic pop")
                                                                 
 #define MODULE_PROPHANDLERS_START()                             MODULE_PROPHANDLERS_START_(MODULE_PROPHANDLERS_PREFIX,MODULE_NAME,MODULE_PROPHANDLER_PREFIX)
 #define MODULE_PROPHANDLERS_START_(prefix,modname,ph_prefix)    MODULE_PROPHANDLERS_START__(prefix,modname,ph_prefix)
@@ -245,7 +259,7 @@ typedef struct
                                                                     .property        = id, \
                                                                     .property_length = 0, \
                                                                 }; \
-                                                                void prefix##modname##_##id( \
+                                                                void REQUIRES(PropMgrTask) prefix##modname##_##id( \
                                                                         unsigned int property, \
                                                                         void *       token, \
                                                                         uint32_t *   buf, \
@@ -264,6 +278,7 @@ PROP_HANDLER(id) { \
 /* load all available modules. will be used on magic lantern boot */
 void module_load_all(void);
 void module_unload_all(void);
+void toggle_module_enabled(int mod_number);
 
 /* explicitely load a standalone module. this is comparable to an executable */
 void *module_load(char *filename);
@@ -274,6 +289,7 @@ unsigned int module_get_symbol(void *module, char *symbol);
 /* those are used by e.g. mlv_lite to surf the loaded modules and their versions */
 int module_get_next_loaded(int mod_number);
 const char* module_get_string(int mod_number, const char* name);
+int module_get_number(const char *name);
 const char* module_get_name(int mod_number);
 
 /* execute all callback routines of given type. maybe it will get extended to support varargs */

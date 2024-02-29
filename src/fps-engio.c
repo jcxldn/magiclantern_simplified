@@ -127,10 +127,11 @@ static int fps_values_x1000[] = {
     150, 200, 250, 333, 400, 500, 750, 1000, 1500, 2000, 2500, 3000, 4000,
     5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 12500, 14000, 15000, 16000,
     17000, 18000, 19000, 20000, 21000, 22000, 23000, 23976, 24000, 25000, 26000, 27000,
-    28000, 29000, 29970, 30000, 31000, 32000, 33000, 33333, 34000, 35000
+    28000, 29000, 29970, 30000, 31000, 32000, 33000, 33333, 34000, 35000,
     // restrict max fps to 35 for 1100D, 5D2, 50D, 500D (others?)
     #if !defined(CONFIG_1100D) && !defined(CONFIG_5D2) && !defined(CONFIG_50D) && !defined(CONFIG_500D)
-    , 37000, 38000, 39000, 40000, 41000, 42000, 43000, 44000, 45000, 48000, 50000, 60000, 65000, 70000
+    36000, 37000, 38000, 39000, 40000, 41000, 42000, 43000, 44000, 45000, 46000, 47000, 48000,
+    50000, 55000, 59940, 60000, 61000, 62000, 63000, 64000, 65000, 70000
     #endif
 };
 
@@ -164,7 +165,9 @@ static CONFIG_INT("fps.sync.shutter", fps_sync_shutter, 0);
 #ifdef FEATURE_FPS_RAMPING
 static CONFIG_INT("fps.ramp", fps_ramp, 0);
 static CONFIG_INT("fps.ramp.duration", fps_ramp_duration, 3);
+#ifdef FEATURE_FPS_OVERRIDE
 static int fps_ramp_timings[] = {1, 2, 5, 15, 30, 60, 120, 300, 600, 1200, 1800};
+#endif
 static int fps_ramp_up = 0;
 #else
 #define fps_ramp 0
@@ -239,7 +242,7 @@ static void fps_read_current_timer_values();
     #define FPS_TIMER_A_MIN (fps_timer_a_orig)
 #elif defined(CONFIG_EOSM)
     #define TG_FREQ_BASE 32000000
-    #define FPS_TIMER_A_MIN (ZOOM ? 666 : MV1080CROP ? 532 : 520)
+    #define FPS_TIMER_A_MIN (ZOOM ? 716 : MV1080CROP ? 532 : 520)
     #undef FPS_TIMER_B_MIN
     #define FPS_TIMER_B_MIN ( \
     RECORDING_H264 ? (MV1080CROP ? 1750 : MV720 ? 990 : 1970) \
@@ -269,7 +272,7 @@ static void fps_read_current_timer_values();
     #define FPS_TIMER_A_MIN (fps_timer_a_orig)
 #elif defined(CONFIG_100D)
     #define TG_FREQ_BASE 32000000
-    #define FPS_TIMER_A_MIN (ZOOM ? 676 : MV1080CROP ? 540 : 520)
+    #define FPS_TIMER_A_MIN (ZOOM ? 724 : MV1080CROP ? 540 : 520)
     #undef FPS_TIMER_B_MIN
     // no need to cause confusions as recording speed cannot handle such high fps in crop mode
     // (ZOOM || MV1080CROP ? 1288 : 1970)) <-- these are ok while not recording.
@@ -486,7 +489,20 @@ int get_current_shutter_reciprocal_x1000()
     #else
     int blanking = nrzi_decode(FRAME_SHUTTER_BLANKING_READ);
     #endif
-    int max = fps_timer_b;
+
+    /* read the FPS timer B directly from ENGIO shadow memory to have the latest value */
+    int timerB = (FPS_REGISTER_B_VALUE & 0xFFFF) + 1;
+    int max = timerB;
+
+    if (blanking == max - 1)
+    {
+        /* fixme: when blanking is max - 1, exposure time is 0
+         * however, if we adjust either of these two terms by 1,
+         * neither 1/33.333 nor 1/50.000 will give exact values
+         * which is right? (todo: compare some test images to find out) */
+        blanking = max;
+    }
+
     float frame_duration = 1000.0 / fps_get_current_x1000();
     float shutter = frame_duration * (max - blanking) / max;
     return (int)(1.0 / shutter * 1000);
@@ -536,8 +552,12 @@ int get_current_shutter_reciprocal_x1000()
     //
     // This function returns 1/EA and does all calculations on integer numbers, so actual computations differ slightly.
 
+    //#warning FIXME: consider defining FRAME_SHUTTER_BLANKING_READ
+    /* this might use old FPS timer values updated by fps_task */
+    /* it's not thread-safe to re-read them here again */
     return get_shutter_reciprocal_x1000(shutter_r_x1000, fps_timer_a, fps_timer_a_orig, fps_timer_b, fps_timer_b_orig);
 #else
+    //#warning FIXME: consider defining FRAME_SHUTTER_BLANKING_READ
     // fallback to APEX units
     if (!lens_info.raw_shutter) return 0;
     return (int) roundf(powf(2.0f, (lens_info.raw_shutter - 136) / 8.0f) * 1000.0f * 1000.0f);
@@ -1575,10 +1595,8 @@ static void fps_read_current_timer_values()
 {
     if (!lv) { fps_timer_a = fps_timer_b = 0; return; }
 
-    int VA = FPS_REGISTER_A_VALUE;
-    int VB = FPS_REGISTER_B_VALUE;
-    fps_timer_a = (VA & 0xFFFF) + 1;
-    fps_timer_b = (VB & 0xFFFF) + 1;
+    fps_timer_a = (FPS_REGISTER_A_VALUE & 0xFFFF) + 1;
+    fps_timer_b = (FPS_REGISTER_B_VALUE & 0xFFFF) + 1;
 }
 
 /*static int fps_check_if_current_timer_values_changed()
@@ -1629,7 +1647,6 @@ static void fps_check_refresh()
 }
 
 #ifdef FEATURE_FPS_OVERRIDE
-
 #ifdef CONFIG_FPS_UPDATE_FROM_EVF_STATE
 static int fps_video_mode_changed()
 {
@@ -1675,7 +1692,7 @@ static void fps_disable_timers_evfstate()
     fps_timerA_override = fps_timerB_override = 0;
 }
 
-#endif
+#endif // CONFIG_FPS_UPDATE_FROM_EVF_STATE
 
 // do all FPS changes from this task only - to avoid trouble ;)
 static void fps_task()
@@ -1751,7 +1768,6 @@ static void fps_task()
         if (FPS_RAMP) // artistic effect - http://www.magiclantern.fm/forum/index.php?topic=2963.0
         {
             f = MIN(f, default_fps); // no overcranking possible with FPS ramping
-
             int total_duration = fps_ramp_timings[fps_ramp_duration];
             float delta = 1.0 / 50 / total_duration;
 
@@ -2145,9 +2161,9 @@ void set_frame_shutter_timer(int timer)
 {
     #ifdef CONFIG_FRAME_SHUTTER_OVERRIDE
         #ifdef CONFIG_DIGIC_V
-        FRAME_SHUTTER_TIMER = MAX(timer, 2);
-        #else
         FRAME_SHUTTER_TIMER = MAX(timer, 1);
+        #else
+        FRAME_SHUTTER_TIMER = MAX(timer, 0);
         #endif
     #endif
 }
@@ -2165,6 +2181,14 @@ int can_set_frame_shutter_timer()
 
     #ifdef CONFIG_FRAME_SHUTTER_OVERRIDE
     return 1;
+    #else
+    return 0;
+    #endif
+}
+int get_frame_aperture()
+{
+    #ifdef FRAME_APERTURE
+    return FRAME_APERTURE & 0xFF;
     #else
     return 0;
     #endif

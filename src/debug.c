@@ -618,157 +618,242 @@ static uint32_t ___get_photo_cmos_iso_start_200d(void)
 }
 #endif
 
+
+#if 1 && defined(CONFIG_MMU_REMAP) && defined(CONFIG_200D)
+#include "dryos_rpc.h"
+#include "patch.h"
+#include "mmu_utils.h"
+extern int uart_printf(const char *fmt, ...);
+extern void change_mmu_tables(uint8_t *ttbr0, uint8_t *ttbr1, uint32_t cpu_id);
+void print_test()
+{
+    int cpu_id = get_cpu_id();
+    uart_printf("cpu%d: %s\n", cpu_id, 0xf0048842);
+}
+
+static void change_mmu_tables_cpu1(void *arg)
+{
+    uint32_t cpu_id = get_cpu_id();
+    uint32_t cpu_mmu_offset = MMU_L1_TABLE_SIZE - 0x100 + cpu_id * 0x80;
+
+    struct mmu_config *mmu_conf = (struct mmu_config *)arg;
+    // update TTBRs (this DryOS function also triggers TLBIALL)
+    change_mmu_tables(mmu_conf->L1_table + cpu_mmu_offset,
+                      mmu_conf->L1_table,
+                      cpu_id);
+}
+#endif
+
 int yuv_dump_sec = 0;
 static void run_test()
 {
     DryosDebugMsg(0, 15, "run_test fired");
 
-#if 0 && defined(CONFIG_200D)
-    #include "patch.h"
+#if 1 && defined(CONFIG_200D)
+    // log multishot stuff
+//    dm_set_store_level(0xa6, 2);
+//    dm_set_print_level(0xa6, 2);
+#endif
 
-    // Three candidate CMOS ISO tables, RAM addresses
-    // (not stable in theory but are for my cam, real code
-    // should search for these)
-    // 0x21f9dc0: +0x19c0, size 36, count 24
-    // 0x21fc938: +0x4538, size 112 / 0x70, count 24
-    // 0x21fd3b8: +0x4fb8, size 112 / 0x70, count 24
+#if 1 && defined(CONFIG_200D)
+    // attempt Mem2Mem EDMAC copy!
+    DryosDebugMsg(0, 15, "Attempting EDMAC mem->mem copy");
 
-    msleep(100);
-    uint32_t *p = NULL;
-    for (p = (uint32_t *)0x2000; p < (uint32_t *)0x2800000; p++)
+    // create test buffers
+    //
+    // Get 256k aligned to 4k, we will split into two
+    // EDMAC copies do have some alignment requirements on the buffers,
+    // I don't know what they are yet, but apparently less than 4k.
+    uint32_t slab_size = 1 << 18; // 256kB
+//    uint32_t slab_size = 1 << 22; // 4MB
+//    uint32_t slab_size = 1 << 23; // 8MB
+    uint32_t region_size = slab_size / 2;
+    uint8_t *slab = malloc_aligned(slab_size, 0x1000);
+// Dirty hack for testing large transfers on 200d:
+//    uint8_t *slab = (uint8_t *)0x43980000; // probably unused shoot mem
+    if (slab == NULL)
     {
-        if (p[0] == 0x0b400000
-            && p[1] == 0x0cc03333
-            && p[2] == 0x0d001f1f
-            && p[3] == 0x0d401f1f)
-        {
-            //DryosDebugMsg(0, 15, "Match: 0x%08x", p);
-            print_match((uint32_t)p);
-        }
+        DryosDebugMsg(0, 15, "Failed to get aligned slab");
+        return;
     }
-    //DryosDebugMsg(0, 15, " ==== Search finished ====", p);
+    uint8_t *dst = slab;
+    uint8_t *src = slab + region_size;
 
-    for (p = (uint32_t *)0x2000; p < (uint32_t *)0x2800000; p++)
-    {
-        if (p[0] == 0x0b400000
-            && p[1] == 0x0cc03333
-            && p[2] == 0xffffffff
-            && p[3] == 0x03080201)
-        {
-            //DryosDebugMsg(0, 15, "Match: 0x%08x", p);
-            print_match((uint32_t)p);
-        }
-    }
-    //DryosDebugMsg(0, 15, " ==== Search finished ====", p);
+    // Use Uncacheable addresses, and flush read cache before read.
+    // Unsure if required, but old ML code does this and I've only
+    // observed Uncache addresses being used on 200d.
+    dst = UNCACHEABLE(dst);
+    src = UNCACHEABLE(src);
+
+    // initialise content.  The markers allow
+    // detecting overwrites when memcmp'ing the regions.
+    memset(dst, 0, region_size);
+    memset(dst, 0x11, 2); // start marker
+    memset(dst + region_size - 2, 0x22, 2); // end marker
+
+    memset(src, 0xa5, region_size);
+    memset(src, 0x33, 2); // start marker
+    memset(src + region_size - 2, 0x44, 2); // end marker
+    sync_caches();
+
+    DryosDebugMsg(0, 15, "region_size: 0x%x", region_size);
+    DryosDebugMsg(0, 15, "dst, src: 0x%x, 0x%x", dst, src);
+    DryosDebugMsg(0, 15, "Pre-copy, *dst, *src: 0x%x, 0x%x",
+                  *(uint32_t *)dst,
+                  *(uint32_t *)src);
+
+    // build required structs
+    // mem_to_mem_edmac_copy() expects a pointer to this:
+    //
+    // m2m_copy_info
+    //    m2m_edmac_dst_src_info *
+    //        edmac_info *
+    //            off1a // x-offset between regular tiles (can be negative for overlap)
+    //            off1b // x-offset between remainder tiles (can be negative)
+    //            off2a // y-offset between regular tiles (can be negative)
+    //            off2b // y-offset between remainder tiles (can be negative)
+    //            off3  // x-offset between an entire row (essentially, copy region width)
+    //            xa // regular tile width, bytes
+    //            xb // remainder column, tile width, bytes
+    //            ya // regular tile (height - 1), rows (presumably min 2 if xa is > 1?  Untested)
+    //            yb // remainder row, tile (height - 1), min 1 (i.e. min 2).  Possibly min 0 if xa is non-zero?
+    //            xn // number of columns of regular tiles
+    //            yn // number of rows of regular tiles
+    //        edmac_info *
+    //            (point to same struct as above)
+    //        uint32_t addr1
+    //        uint32_t addr2
+    //    m2m_channel_res_info *
+    //        uint32_t *resIds
+    //        uint32_t resIdCount
+    //        uint32_t chan_1
+    //        uint32_t chan_2
+    //
+    // Mem2Mem used fixed values for resIds, resIdCount, chan_1 and chan_2,
+    // which can be determined by MMU hooking create_mem_to_mem_lock_and_channel_stuff(),
+    // e019bad0, see mem_to_mem_edmac_copy(), which calls this as:
+    // create_mem_to_mem_lock_and_channel_stuff(chan_1, chan_2, resIds, resCount);
+    //
+    // The format for edmac_info is described here:
+    // https://www.magiclantern.fm/forum/index.php?topic=18315.0
+    // And I would say more useful, in the quoted patent:
+    // https://patents.google.com/patent/US7817297
+    // 
+    // An apparently common usage in Canon code is to only set xb and yb to non-zero
+    // values.  This implies 0 regular tiles, and 1 remainder tile covering the
+    // whole region.
+    //
+    // Because the region has no associated memory address, it's position-independent.
+    // If your copy doesn't change the shape of the region, you can use the same struct
+    // for dst and src.
+
+// known good
 /*
-    uint32_t addr, size, count;
-    for (addr = 0x21f9dc0, size = 36, count = 24; count > 0; count--)
-    {
-        if ((*(uint32_t *)addr & 0xfff00000) == 0x0b400000)
-            patch_memory(addr, *(uint32_t *)addr, 0x0b444000, NULL);
-        addr += size;
-    }
+    struct edmac_info region = {
+        .off1a = 0,
+        .off1b = 0,
+        .off2a = 0,
+        .off2b = 0,
+        .off3 = 0,
+        .xa = 0,
+        .xb = region_size / 64, // this field has some limitations.  Since yb must be at least
+                                // 1 (or maybe not, if we use xa?  Untested), and that means 2 rows,
+                                // this field must be no more than half the region size.
+                                //
+                                // It must also be lower than 0x20000.  If you need a large copy,
+                                // you must increase yb and proportionally decrease xb.
+                                // I don't know the exact limit.  0x10000 is okay.
+                                //
+                                // 64 works for 256kB up to 4MB (and beyond, according to maths...
+                                // but I haven't tested beyond on hw)
+        .ya = 0,
+        .yb = 63, // 64 rows
+        .xn = 0,
+        .yn = 0
+    };
 */
 
+    // Let's try many cols, incl. one xb col, no rows.  Assume region_size 128kB == 0x20000,
+    // that factors to (0xff * 0x200) + 0x200
+    //
+    // This one works!
+// known good
+    struct edmac_info region = {
+        .off1a = 0,
+        .off1b = 0,
+        .off2a = 0,
+        .off2b = 0,
+        .off3 = 0,
+        .xa = 0x200, // "regular" col width
+        .xb = 0x200, // "irregular" col width
+        .ya = 0,
+        .yb = 0,
+        .xn = 0xff, // 0xff regular columns
+        .yn = 0
+    };
 
-#endif
+    // these struct defs should probably move to edmac.h,
+    // or maybe edmac-memcpy.h
+    struct m2m_edmac_dst_src_info {
+        struct edmac_info *src_region; // not actually tested which region is dst or src,
+        struct edmac_info *dst_region; // assuming it's the same order as following src + dst args
+        uint8_t *src;
+        uint8_t *dst;
+    };
 
-#if 0 && defined(CONFIG_200D)
-    //___get_photo_cmos_iso_start_200d();
-    DryosDebugMsg(0, 15, "0x421fc938: 0x%08x", *(uint32_t *)0x421fc938);
-    DryosDebugMsg(0, 15, "0x21fc938:  0x%08x", *(uint32_t *)0x21fc938);
+    struct m2m_channel_res_info {
+        uint32_t *resIds;
+        uint32_t resIdCount;
+        uint32_t channel_1;
+        uint32_t channel_2;
+    };
 
-/*
-    info_led_on();
-    // CMOS ISO table is setup by a DMA read from f8910000,
-    // but the dst is a heap address and not reliably predictable.
-    // The DMA src addr is recorded in some linked-list struct, possibly
-    // property related.  That struct also holds the dst addr.
-    uint32_t addr = 0x300000;
-    while (addr <  0x3000000)
-    {
-        if (*(uint32_t *)addr == 0x0b400000
-            && *(uint32_t *)(addr + 4) == 0x0cc03333)
-        {
-            DryosDebugMsg(0, 15, "Possible match: 0x%08x\n", addr);
-            dump_match(addr);
-        }
-        addr += 4;
-    }
-    info_led_off();
-*/
-#endif
+    struct m2m_copy_info {
+        struct m2m_edmac_dst_src_info *edmac_regions;
+        struct m2m_channel_res_info *res_info; // not a great name
+    };
 
-#if 0 && defined(CONFIG_550D)
-    // try to walk to the CMOS ISO tables, logging the steps along the way
+    struct m2m_edmac_dst_src_info m2m_edmac_dst_src_info = {
+        .src_region = &region,
+        .dst_region = &region,
+        .src = src,
+        .dst = dst 
+    };
 
-    info_led_on();
-    FILE* f = FIO_CreateFile("ML/LOGS/iso_hunt.log");
-    // CMOS ISO table is setup by a DMA read from f8910000,
-    // but the dst is a heap address and not reliably predictable.
-    // The DMA src addr is recorded in some linked-list struct, possibly
-    // property related.  That struct also holds the dst addr.
-    uint32_t addr = 0x3d0000;
-    while (*(uint32_t *)addr != 0xf8910000
-           && addr < 0x800000)
-    {
-        addr += 4;
-    }
-    if (*(uint32_t *)addr != 0xf8910000)
-        goto close;
-    my_fprintf(f, "Found f8910000: 0x%08x\n", addr);
-    my_fprintf(f, "+0x18: 0x%08x\n", *(uint32_t *)(addr + 0x18));
+    struct m2m_channel_res_info m2m_channel_res_info = {
+         // following values found via hooking create_mem_to_mem_stuff()
+        .resIds = (uint32_t *)0xe0c21efc,
+        .resIdCount = 3,
+        .channel_1 = 0x2b, // Same as Digic 4 and 5!
+        .channel_2 = 0x11  // Also the same, encouraging.
+    };
 
-close:
-    FIO_CloseFile(f);
-    info_led_off();
-#endif
+    struct m2m_copy_info m2m_copy_info = {
+        .edmac_regions = &m2m_edmac_dst_src_info,
+        .res_info = &m2m_channel_res_info
+    };
 
-#if 0 && (defined(CONFIG_200D) || defined(CONFIG_850D))
-    // trigger an assert
-    extern void debug_assert(char *msg, char *file, int line);
-    debug_assert("LIFE == FAIR", "this file", 1);
-    // or the following will trigger an exception on MMU cams
-//    int crash_now_please = *(int *)0x0;
-//    DryosDebugMsg(0, 15, "not unused: 0x%x", crash_now_please);
-#endif
+    // cross fingers and trigger copy
+    extern void mem_to_mem_edmac_copy(struct m2m_copy_info *);
+    int before, after;
+    before = get_ms_clock();
+    mem_to_mem_edmac_copy(&m2m_copy_info);
+    after = get_ms_clock();
 
-#if 0
-    if (is_hooked)
-    {
-        DryosDebugMsg(0, 15, "last value seen: 0x%x", intercepted_val);
-    }
+    DryosDebugMsg(0, 15, "Post-copy, *dst, *src: 0x%x, 0x%x",
+                  *(uint32_t *)dst,
+                  *(uint32_t *)src);
+    DryosDebugMsg(0, 15, "ms time for size 0x%x: %d", region_size, after - before);
+    if (memcmp(dst, src, region_size) != 0)
+        DryosDebugMsg(0, 15, "dst / src content mismatch!");
     else
-    {
-        hook_memoryManager_AllocateMemory();
-    }
-    DryosDebugMsg(0, 15, "returned from hooking");
-#endif
+        DryosDebugMsg(0, 15, "dst / src content equal :)");
 
-#if 0
-    static int dm_toggle = 1;
-    if (dm_toggle)
-    {
-        DryosDebugMsg(0, 15, "Logging less");
-//        dm_set_store_level(0x80, 0x17);
-        dm_set_print_level(0x0, 0x8);
-        dm_set_store_level(0x0, 0x8);
-        dm_set_print_level(0x80, 0x5);
-        dm_set_store_level(0x80, 0x5);
-        dm_toggle = 0;
-    }
-    else
-    {
-        DryosDebugMsg(0, 15, "Logging more");
-//        dm_set_store_level(0x80, 0x1); // re-enables SRM related logging
-        dm_set_print_level(0x0, 0x5);
-        dm_set_store_level(0x0, 0x5);
-        dm_set_print_level(0x80, 0x3);
-        dm_set_store_level(0x80, 0x3);
-        dm_toggle = 1;
-    }
+    free_aligned(slab);
+    slab = NULL;
+    dst = NULL;
+    src = NULL;
 #endif
-
 }
 
 #ifdef FEATURE_BOOTFLAG_MENU
@@ -802,9 +887,12 @@ static void unmount_sd_card()
     console_show();
     
     /* call shutdown hooks that need to save configs */
-    extern int module_shutdown();
     config_save_at_shutdown();
+
+#if defined(CONFIG_MODULES)
+    extern int module_shutdown();
     module_shutdown();
+#endif
     
     /* unmount the SD card */
     FSUunMountDevice(2);

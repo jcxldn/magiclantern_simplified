@@ -3,7 +3,6 @@
 ![](../doc/logo-trans.png)
 </span>
 
-<div style="page-break-after: always; visibility: hidden"/>
+Some text for section 00.
 
-
-
+<div style="page-break-after: always; visibility: hidden"></div>

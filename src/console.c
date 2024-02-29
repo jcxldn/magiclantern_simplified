@@ -22,7 +22,11 @@
 
 // buffer is circular and filled with spaces
 #define BUFSIZE (CONSOLE_H * CONSOLE_W)
-static char console_buffer[BUFSIZE] = {[0 ... BUFSIZE-1] = ' '};
+static char console_buffer[BUFSIZE]
+    #ifndef PYCPARSER
+    = {[0 ... BUFSIZE-1] = ' '}
+    #endif
+;
 static int console_buffer_index = 0;
 #define CONSOLE_BUFFER(i) console_buffer[MOD((i), BUFSIZE)]
 
@@ -318,8 +322,7 @@ TASK_CREATE( "console_task", console_task, 0, 0x1d, 0x1000 );
 int printf(const char* fmt, ...)
 {
     /* when called from init_task, 512 bytes are enough to cause stack overflow */
-    extern int ml_started;
-    int buf_size = (ml_started) ? 512 : 64;
+    int buf_size = (streq(current_task->name, "init")) ? 64 : 512;
     char* buf = alloca(buf_size);
     
     va_list         ap;

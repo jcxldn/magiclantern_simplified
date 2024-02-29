@@ -444,9 +444,13 @@ static int round_nicely(int x, int digits)
 const char * lens_format_shutter_reciprocal(int shutter_reciprocal_x1000, int digits)
 {
     static char shutter[32];
-    if (shutter_reciprocal_x1000 == 0)
+    if (shutter_reciprocal_x1000 <= 0)
     {
         snprintf(shutter, sizeof(shutter), "N/A");
+    }
+    else if (shutter_reciprocal_x1000 == INT_MAX)
+    {
+        snprintf(shutter, sizeof(shutter), "0.0");
     }
     else if (shutter_reciprocal_x1000 >= 10000000)
     {
@@ -663,11 +667,17 @@ lens_focus(
     int extra_delay
 )
 {
+#ifdef CONFIG_FOCUS_COMMANDS_PROP_NOT_CONFIRMED
+    /* always wait on old models */
+    wait = 1;
+#endif
+
     lv_focus_done = 0;
     lv_focus_error = 0;
 
     if (!lv) return 0;
     if (is_manual_focus()) return 0;
+    if (is_continuous_af()) return 0;
 
     if (num_steps < 0)
     {
@@ -695,13 +705,23 @@ lens_focus(
                 /* not all cameras having this string require this though (550D, maybe 7D as well) */
                 /* todo: VxWorks cameras may require this too */
                 extern volatile int pfAfComplete_counter;
+
                 int old = pfAfComplete_counter;
-
-                prop_request_change(PROP_LV_LENS_DRIVE_REMOTE, &focus_cmd, 4);
-
                 while (pfAfComplete_counter == old)
                 {
-                    msleep(10);
+                    msleep(20);
+                }
+
+                /* send focus command */
+                prop_request_change(PROP_LV_LENS_DRIVE_REMOTE, &focus_cmd, 4);
+
+                /* wait for confirmation from PROP_LV_FOCUS_DONE */
+                lens_focus_wait();
+
+                old = pfAfComplete_counter;
+                while (pfAfComplete_counter == old)
+                {
+                    msleep(20);
                 }
 #else
                 /* request and wait for confirmation */

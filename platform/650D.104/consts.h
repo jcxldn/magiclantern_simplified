@@ -157,8 +157,9 @@
 #define DISPLAY_TRAP_FOCUS_MSG_BLANK "          "
 
 // In bindGUIEventFromGUICBR, look for "LV Set" => arg0 = 8
-// Next, in SetGUIRequestMode, look at what code calls NotifyGUIEvent(8, something)
-#define GUIMODE_ML_MENU (RECORDING ? 0 : lv ? 90 : 2) // any from 88...98 ?!
+// Next, in SetGUIRequestMode, look at what code calls NotifyGUIEvent(8, something) => valid values from 88 to 98
+// 97 and 91 show the same dialog as on 700D
+#define GUIMODE_ML_MENU (RECORDING ? 97 : lv ? 91 : 2)
 #define NUM_PICSTYLES 10
 
 #define FLASH_MAX_EV 3
@@ -231,6 +232,7 @@
 // see "Malloc Information"
 #define MALLOC_STRUCT 0x4b428
 #define MALLOC_FREE_MEMORY (MEM(MALLOC_STRUCT + 8) - MEM(MALLOC_STRUCT + 0x1C)) // "Total Size" - "Allocated Size"
+#define SRM_BUFFER_SIZE 0x1F24000   /* print it from srm_malloc_cbr */
 
 #define UNAVI (MEM(0x4188c)) // dec CancelUnaviFeedBackTimer, then look around that memory area for a location that changes when you keep HS pressed
 #define UNAVI_AV (MEM(0x418C0)) //Same as above, but this location is linked to the exp comp button

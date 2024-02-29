@@ -60,7 +60,6 @@ extern uint32_t ml_refresh_display_needed;
 
 
 #define DIGIC_ZEBRA_REGISTER 0xC0F140cc
-#define FAST_ZEBRA_GRID_COLOR 4 // invisible diagonal grid for zebras; must be unused and only from 0-15
 
 // those colors will not be considered for histogram (so they should be very unlikely to appear in real situations)
 #define MZ_WHITE 0xFE12FE34
@@ -521,6 +520,7 @@ static void hist_add_pixel(uint32_t pixel, int Y)
 #ifdef FEATURE_WAVEFORM
 static inline void waveform_add_pixel(int x, int Y)
 {
+    if (!waveform) return;
     uint8_t* w = &WAVEFORM(((x-os.x0) * WAVEFORM_WIDTH) / os.x_ex, (Y * WAVEFORM_HEIGHT) >> 8);
     if ((*w) < 250) (*w)++;
 }
@@ -957,6 +957,8 @@ waveform_draw_image(
     unsigned        height
 )
 {
+    if (!waveform) return;
+
     if (!PLAY_OR_QR_MODE)
     {
         if (!lv_luma_is_accurate()) return;
@@ -1022,16 +1024,6 @@ waveform_draw_image(
                 // Draw the pixel, rounding down to the nearest
                 // quad word write (and then nop to avoid err70).
                 *(uint32_t*) ALIGN32(row + i) = pixel;
-                #ifdef CONFIG_500D // err70?!
-                asm( "nop" );
-                asm( "nop" );
-                asm( "nop" );
-                asm( "nop" );
-                asm( "nop" );
-                asm( "nop" );
-                asm( "nop" );
-                asm( "nop" );
-                #endif
                 pixel = 0;
             }
         }
@@ -3150,12 +3142,6 @@ void copy_zebras_from_mirror()
             uint32_t m = M[BM(j,i)/4];
             if (p != 0) continue;
             B[BM(j,i)/4] = m & ~0x80808080;
-            #ifdef CONFIG_500D
-            asm("nop");
-            asm("nop");
-            asm("nop");
-            asm("nop");
-            #endif
         }
     }
 }
@@ -3171,12 +3157,6 @@ void clear_zebras_from_mirror()
             uint8_t m = M[BM(j,i)];
             if (m & 0x80) continue;
             M[BM(j,i)] = 0;
-            #ifdef CONFIG_500D
-            asm("nop");
-            asm("nop");
-            asm("nop");
-            asm("nop");
-            #endif
         }
     }
 }
@@ -3791,7 +3771,7 @@ void draw_histogram_and_waveform(int allow_play)
     if (is_zoom_mode_so_no_zebras()) return;
         
 #ifdef FEATURE_WAVEFORM
-    if( waveform_draw)
+    if (waveform_draw)
     {
         #ifdef CONFIG_4_3_SCREEN
         if (PLAY_OR_QR_MODE && WAVEFORM_FACTOR == 1)
@@ -4163,7 +4143,7 @@ livev_hipriority_task( void* unused )
 
         int mz = should_draw_zoom_overlay();
 
-        lv_vsync(mz);
+        _lv_vsync(mz);
         guess_fastrefresh_direction();
 
         #ifdef FEATURE_MAGIC_ZOOM
@@ -4688,6 +4668,15 @@ PROP_HANDLER(PROP_LV_ACTION)
     
     #ifdef FEATURE_LV_ZOOM_SETTINGS
     zoom_sharpen_step();
+    #endif
+
+    #ifdef CONFIG_500D
+    if (buf[0] == 0 && !is_manual_focus())
+    {
+        /* disable the "Perform autofocus with AE lock <*> button" message in LiveView */
+        extern void FirstWarningTimer_CBR(void);
+        FirstWarningTimer_CBR();
+    }
     #endif
 }
 

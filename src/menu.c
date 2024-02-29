@@ -144,8 +144,12 @@ static int is_customize_selected();
 
 extern void CancelDateTimer();
 
-#define CAN_HAVE_PICKBOX(entry) ((entry)->max > (entry)->min && (((entry)->max - (entry)->min < 15) || (entry)->choices) && IS_ML_PTR((entry)->priv))
-#define SHOULD_HAVE_PICKBOX(entry) ((entry)->max > (entry)->min + 1 && (entry)->max - (entry)->min < 10 && IS_ML_PTR((entry)->priv))
+#define CAN_HAVE_PICKBOX(entry) (                               \
+    (entry)->max > (entry)->min &&                              \
+    (((entry)->max - (entry)->min < 15) || (entry)->choices) && \
+    IS_ML_PTR((entry)->priv) &&                                 \
+    !uses_caret_editing(entry))
+
 #define IS_BOOL(entry) (((entry)->max - (entry)->min == 1 && IS_ML_PTR((entry)->priv)) || (entry->icon_type == IT_BOOL))
 #define IS_ACTION(entry) ((entry)->icon_type == IT_ACTION || (entry)->icon_type == IT_SUBMENU)
 #define SHOULD_USE_EDIT_MODE(entry) (!IS_BOOL(entry) && !IS_ACTION(entry))
@@ -645,7 +649,7 @@ static void menu_numeric_toggle_long_range(int* val, int delta, int min, int max
 }
 
 /* for editing with caret */
-static int get_caret_delta(struct menu_entry * entry, int sign)
+static int64_t get_caret_delta(struct menu_entry * entry, int64_t sign)
 {
     if(!EDIT_OR_TRANSPARENT)
     {
@@ -663,7 +667,7 @@ static int get_caret_delta(struct menu_entry * entry, int sign)
 
         case UNIT_HEX:
         {
-            return sign * powi(16, caret_position);
+            return sign * (int64_t) powi(16, caret_position);
         }
 
         case UNIT_TIME:
@@ -695,23 +699,62 @@ static int editing_with_caret(struct menu_entry * entry)
 static void caret_move(struct menu_entry * entry, int delta)
 {
     int max = (entry->unit == UNIT_TIME) ? 7 :
-              (entry->unit == UNIT_HEX)  ? log2i(MAX(ABS(entry->max),ABS(entry->min)))/4
-                                         : log10i(MAX(ABS(entry->max),ABS(entry->min))/2) ;
+              (entry->unit == UNIT_HEX)  ? log2i((uint32_t)entry->max) / 4
+                                         : log10i(MAX(ABS(entry->max),ABS(entry->min))) ;
 
-    menu_numeric_toggle(&caret_position, delta, 0, max);
+    caret_position = MOD(caret_position + delta, max + 1);
 
     /* skip "h", "m" and "s" positions for time fields */
     if(entry->unit == UNIT_TIME && (caret_position == 0 || caret_position == 3 || caret_position == 6))
     {
-        menu_numeric_toggle(&caret_position, delta, 0, max);
+        caret_position = MOD(caret_position + delta, max + 1);
     }
 }
 
 void menu_numeric_toggle(int* val, int delta, int min, int max)
 {
     ASSERT(IS_ML_PTR(val));
+    int old_val = (*val);
+    int new_val = old_val + delta;
 
-    set_config_var_ptr(val, MOD(*val - min + delta, max - min + 1) + min);
+    /* wrap around, keeping the lower digits unchanged */
+    new_val = (new_val < min) ? max : (new_val > max) ? min : new_val;
+
+    /* keep lower digits from the old value */
+    /* 13 -> 3 -> -7 -> -17 doesn't look very intuitive */
+    /* 13 -> 3 -> -3 -> -13 might be a bit better */
+    int lo = MOD(ABS(old_val), ABS(delta));
+    int hi = ABS(new_val) / ABS(delta);
+    new_val = (hi * ABS(delta) + lo) * SGN(new_val);
+
+    /* out of range? perform one more increment in the same direction
+     * e.g. [25-150] 25 -> delta -10 -> wrap at 150 -> keep lower digit -> 155 -> one more increment -> 145 */
+    if (new_val < min || new_val > max)
+    {
+        new_val += delta;
+    }
+
+    set_config_var_ptr(val, new_val);
+}
+
+/* same as above, but unsigned; max range: 0 - FFFFFFFF */
+static void menu_numeric_toggle_hex(uint32_t * val, int64_t delta, uint32_t min, uint32_t max)
+{
+    int64_t old_val = (*val);
+    int64_t new_val = old_val + delta;
+    int64_t adelta = ABS(delta);
+
+    /* wrap around, keeping the lower digits unchanged */
+    new_val = (new_val < min) ? max : (new_val > max) ? min : new_val;
+    new_val += (old_val % adelta) - (new_val % adelta);
+
+    /* out of range? perform one more "delta" increment */
+    if (new_val < min || new_val > max)
+    {
+        new_val += delta;
+    }
+
+    set_config_var_ptr((int *) val, (int) new_val);
 }
 
 void menu_numeric_toggle_time(int * val, int delta, int min, int max)
@@ -1008,8 +1051,8 @@ menu_find_by_id(
 }
 */
 
-static struct menu *
-menu_find_by_name_internal(
+static REQUIRES(menu_sem)
+struct menu * menu_find_by_name_internal(
     const char *        name,
     int icon
 )
@@ -1061,8 +1104,8 @@ menu_find_by_name_internal(
     return new_menu;
 }
 
-static struct menu * 
-menu_find_by_name(
+static EXCLUDES(menu_sem)
+struct menu * menu_find_by_name(
     const char *        name,
     int icon
 )
@@ -1264,8 +1307,8 @@ menu_update_placeholder(struct menu * menu, struct menu_entry * new_entry)
 }
 
 
-static void
-menu_add_internal(
+static REQUIRES(menu_sem)
+void menu_add_internal(
     const char *        name,
     struct menu_entry * new_entry,
     int                 count
@@ -1396,8 +1439,8 @@ menu_add_internal(
     }
 }
 
-void 
-menu_add(
+EXCLUDES(menu_sem)
+void menu_add(
     const char *        name,
     struct menu_entry * new_entry,
     int                 count
@@ -1456,8 +1499,8 @@ static void menu_remove_entry(struct menu * menu, struct menu_entry * entry)
     }
 }
 
-void
-menu_remove(
+EXCLUDES(menu_sem)
+void menu_remove(
     const char *        name,
     struct menu_entry * old_entry,
     int         count
@@ -1508,7 +1551,8 @@ static float usage_counter_thr_sub = 0;
 static float usage_counter_max = 0;
 
 /* normalize the usage counters so the next increment is 1.0 */
-static void menu_normalize_usage_counters(void)
+static EXCLUDES(menu_sem)
+void menu_normalize_usage_counters(void)
 {
     take_semaphore(menu_sem, 0);
 
@@ -1582,7 +1626,8 @@ end:
     give_semaphore(menu_sem);
 }
 
-static void menu_usage_counters_update_threshold(int num, int only_submenu_entries, int only_nonsubmenu_entries)
+static EXCLUDES(menu_sem)
+void menu_usage_counters_update_threshold(int num, int only_submenu_entries, int only_nonsubmenu_entries)
 {
     take_semaphore(menu_sem, 0);
 
@@ -2382,6 +2427,10 @@ static int check_default_warnings(struct menu_entry * entry, char* warning)
         );
     else if (DEPENDS_ON(DEP_NOT_SOUND_RECORDING) && sound_recording_enabled())
         snprintf(warning, MENU_MAX_WARNING_LEN, "Disable sound recording from Canon menu!");
+    else if (DEPENDS_ON(DEP_CONTINUOUS_AF) && !is_continuous_af())
+        snprintf(warning, MENU_MAX_WARNING_LEN, "This feature requires %s AF enabled.", is_movie_mode() ? "movie servo" : "continuous");
+    else if (DEPENDS_ON(DEP_NOT_CONTINUOUS_AF) && is_continuous_af())
+        snprintf(warning, MENU_MAX_WARNING_LEN, "This feature requires %s AF disabled.", is_movie_mode() ? "movie servo" : "continuous");
     
     if (warning[0]) 
         return MENU_WARN_NOT_WORKING;
@@ -2422,7 +2471,11 @@ static int check_default_warnings(struct menu_entry * entry, char* warning)
             //~ snprintf(warning, MENU_MAX_WARNING_LEN, "This feature works best with sound recording enabled.");
         //~ else if (WORKS_BEST_IN(DEP_NOT_SOUND_RECORDING) && sound_recording_enabled())
             //~ snprintf(warning, MENU_MAX_WARNING_LEN, "This feature works best with sound recording disabled.");
-        
+        //~ else if (WORKS_BEST_IN(DEP_CONTINUOUS_AF) && !is_continuous_af())
+            //~ snprintf(warning, MENU_MAX_WARNING_LEN, "This feature works best with %s AF enabled.", is_movie_mode() ? "movie servo" : "continuous");
+        //~ else if (WORKS_BEST_IN(DEP_NOT_CONTINUOUS_AF) && is_continuous_af())
+            //~ snprintf(warning, MENU_MAX_WARNING_LEN, "This feature works best with %s AF disabled.", is_movie_mode() ? "movie servo" : "continuous");
+
         if (warning[0]) 
             return MENU_WARN_ADVICE;
     }
@@ -2514,10 +2567,10 @@ entry_default_display_info(
                 }
                 case UNIT_DEC:
                 {
-                    if(edit_mode)
+                    if (EDIT_OR_TRANSPARENT)
                     {
                         char* zero_pad = "00000000";
-                        STR_APPEND(value, "%s%d", (zero_pad + COERCE(8-(caret_position - log10i(MEM(entry->priv))),0,8)), MEM(entry->priv));
+                        STR_APPEND(value, "%s%d", (zero_pad + COERCE(8-(caret_position-log10i(MEM(entry->priv))), 0, 8)), MEM(entry->priv));
                     }
                     else
                     {
@@ -2527,10 +2580,10 @@ entry_default_display_info(
                 }
                 case UNIT_HEX:
                 {
-                    if(edit_mode)
+                    if (EDIT_OR_TRANSPARENT)
                     {
                         char* zero_pad = "00000000";
-                        STR_APPEND(value, "0x%s%x", (zero_pad + COERCE(8-(caret_position - log2i(MEM(entry->priv))/4),0,8)), MEM(entry->priv));
+                        STR_APPEND(value, "0x%s%x", (zero_pad + COERCE(8-(caret_position-(log2i(MEM(entry->priv))/4)), 0, 8)), MEM(entry->priv));
                     }
                     else
                     {
@@ -2565,7 +2618,7 @@ entry_default_display_info(
                 case UNIT_TIME_MS:
                 case UNIT_TIME_US:
                 {
-                    if(edit_mode)
+                    if (EDIT_OR_TRANSPARENT)
                     {
                         char* zero_pad = "00000000";
                         STR_APPEND(value, "%s%d", (zero_pad + COERCE(8-(caret_position - log10i(MEM(entry->priv))),0,8)), MEM(entry->priv));
@@ -2891,7 +2944,7 @@ skip_name:
         }
 
         char* help2 = 0;
-        if (help1 != info->help && info->help && info->help[0])
+        if (help1 != info->help)
         {
             /* help1 already used for something else?
              * put overriden help (via MENU_SET_HELP) here */
@@ -3937,8 +3990,8 @@ show_vscroll(struct menu * parent){
     }
 }
 
-static void
-menus_display(
+static EXCLUDES(menu_sem)
+void menus_display(
     struct menu *       menu,
     int         orig_x,
     int         y
@@ -4310,8 +4363,8 @@ menu_entry_customize_toggle(
     menu_make_sure_selection_is_valid();
 }
 
-static void
-menu_entry_select(
+static EXCLUDES(menu_sem)
+void menu_entry_select(
     struct menu *   menu,
     int mode // 0 = increment, 1 = decrement, 2 = Q, 3 = SET
 )
@@ -4359,7 +4412,9 @@ menu_entry_select(
         {
             /* .priv is a variable? in edit mode, increment according to caret_position, otherwise use exponential R20 toggle */
             /* exception: hex fields are never fast-toggled */
-            if (editing_with_caret(entry) || (entry->unit == UNIT_HEX))
+            if (entry->unit == UNIT_HEX)
+                menu_numeric_toggle_hex(entry->priv, get_caret_delta(entry,-1), entry->min, entry->max);
+            else if (editing_with_caret(entry))
                 menu_numeric_toggle(entry->priv, get_caret_delta(entry,-1), entry->min, entry->max);
             else
                 menu_numeric_toggle_fast(entry->priv, -1, entry->min, entry->max, entry->unit, entry->edit_mode, 0);
@@ -4451,7 +4506,9 @@ menu_entry_select(
         }
         else if (IS_ML_PTR(entry->priv))
         {
-            if (editing_with_caret(entry) || (entry->unit == UNIT_HEX))
+            if (entry->unit == UNIT_HEX)
+                menu_numeric_toggle_hex(entry->priv, get_caret_delta(entry,1), entry->min, entry->max);
+            else if (editing_with_caret(entry))
                 menu_numeric_toggle(entry->priv, get_caret_delta(entry,1), entry->min, entry->max);
             else
                 menu_numeric_toggle_fast(entry->priv, 1, entry->min, entry->max, entry->unit, entry->edit_mode, 0);
@@ -4480,8 +4537,8 @@ menu_entry_select(
 }
 
 /** Scroll side to side in the list of menus */
-static void
-menu_move(
+static EXCLUDES(menu_sem)
+void menu_move(
     struct menu *       menu,
     int         direction
 )
@@ -4532,8 +4589,8 @@ menu_move(
 
 
 /** Scroll up or down in the currently displayed menu */
-static void
-menu_entry_move(
+static EXCLUDES(menu_sem)
+void menu_entry_move(
     struct menu *       menu,
     int         direction
 )
@@ -5188,7 +5245,8 @@ handle_ml_menu_keys(struct event * event)
         break;
 
     case BGMT_PRESS_UP:
-        if (edit_mode && !menu_lv_transparent_mode)
+        if ((edit_mode && !menu_lv_transparent_mode) ||
+            (menu_lv_transparent_mode && !CURRENT_GUI_MODE))
         {
             struct menu_entry * entry = get_selected_menu_entry(menu);
             if(entry && uses_caret_editing(entry))
@@ -5218,7 +5276,8 @@ handle_ml_menu_keys(struct event * event)
         break;
 
     case BGMT_PRESS_DOWN:
-        if (edit_mode && !menu_lv_transparent_mode)
+        if ((edit_mode && !menu_lv_transparent_mode) ||
+            (menu_lv_transparent_mode && !CURRENT_GUI_MODE))
         {
             struct menu_entry * entry = get_selected_menu_entry(menu);
             if(entry && uses_caret_editing(entry))
@@ -5413,7 +5472,7 @@ handle_ml_menu_keys(struct event * event)
 
 
 
-void
+void 
 menu_init( void )
 {
     menus = NULL;
@@ -5900,6 +5959,7 @@ static void select_menu_recursive(struct menu * selected_menu, const char * entr
     }
 }
 
+EXCLUDES(menu_sem)
 void select_menu_by_name(char* name, const char* entry_name)
 {
     take_semaphore(menu_sem, 0);
@@ -5974,7 +6034,8 @@ static struct menu_entry * entry_find_by_name(const char* menu_name, const char*
     return ans;
 }
 
-static void select_menu_by_icon(int icon)
+static EXCLUDES(menu_sem)
+void select_menu_by_icon(int icon)
 {
     take_semaphore(menu_sem, 0);
     for (struct menu * menu = menus; menu; menu = menu->next)
@@ -6002,7 +6063,6 @@ menu_help_go_to_selected_entry(
     struct menu_entry * entry = get_selected_menu_entry(menu);
     if (!entry) return;
     menu_help_go_to_label((char*) entry->name, 0);
-    give_semaphore(menu_sem);
 }
 
 static void menu_show_version(void)
@@ -6168,14 +6228,15 @@ static struct longpress erase_longpress = {
     .long_btn_press     = BGMT_TRASH,           /* long press (500ms) opens ML menu */
     .short_btn_press    = BGMT_PRESS_DOWN,      /* short press => do a regular "down/erase" */
     .short_btn_unpress  = BGMT_UNPRESS_DOWN,
-    .pos_x = 680,   /* in LiveView */
-    .pos_y = 350,   /* above ExpSim */
+    .pos_x = 670,   /* in LiveView */
+    .pos_y = 343,   /* above ExpSim */
 };
 #endif
 
 #ifdef BGMT_Q_SET
 static struct longpress qset_longpress = {
     .long_btn_press     = BGMT_Q_SET,           /* long press opens Q-menu */
+    .long_btn_unpress   = BGMT_UNPRESS_SET,     /* hack: Q-menu will disable the "unpress SET" event */
     .short_btn_press    = BGMT_PRESS_SET,       /* short press => fake SET button (centering AF Frame in LV etc...) */
     .short_btn_unpress  = BGMT_UNPRESS_SET,
     .pos_x = 670,   /* outside ML menu, on the Q screen */
@@ -6601,7 +6662,7 @@ static void menu_reload_flags(char* filename)
     free(buf);
 }
 
-#define CFG_APPEND(fmt, ...) ({ cfglen += snprintf(cfg + cfglen, CFG_SIZE - cfglen, fmt, ## __VA_ARGS__); })
+#define CFG_APPEND(fmt, ...) do { cfglen += snprintf(cfg + cfglen, CFG_SIZE - cfglen, fmt, ## __VA_ARGS__); } while(0)
 #define CFG_SIZE (256*1024)
 
 static int menu_save_unloaded_flags(char* filename, char * cfg, int cfglen)
@@ -6752,11 +6813,13 @@ static char* menu_get_str_value_from_script_do(const char* name, const char* ent
 
     /* not thread-safe; must be guarded by menu_sem */
     entry_default_display_info(entry, info);
+    info->can_custom_draw = 0;
     if (entry->update) entry->update(entry, info);
     return info->value;
 }
 
 /* requires passing a pointer to a local struct menu_display_info for thread safety */
+EXCLUDES(menu_sem)
 char* menu_get_str_value_from_script(const char* name, const char* entry_name, struct menu_display_info * info)
 {
     take_semaphore(menu_sem, 0);
@@ -6765,6 +6828,7 @@ char* menu_get_str_value_from_script(const char* name, const char* entry_name, s
     return ans;
 }
 
+EXCLUDES(menu_sem)
 int menu_set_str_value_from_script(const char* name, const char* entry_name, char* value, int value_int)
 {
     struct menu_entry * entry = entry_find_by_name(name, entry_name);
@@ -6774,14 +6838,21 @@ int menu_set_str_value_from_script(const char* name, const char* entry_name, cha
         return INT_MIN;
     }
 
-    /* if the menu item has multiple choices defined,
-     * or just a valid min/max range, it's easy */
-    if (IS_ML_PTR(entry->priv) && (entry->choices || (entry->max > entry->min)))
+    /* FIXME: trying to print INT_MIN crashes Canon's vsnprintf?! */
+    printf(
+        (value_int == INT_MIN)  ? "menu.set('%s', '%s', '%s')\n"
+                                : "menu.set('%s', '%s', '%s', %d)\n",
+        name, entry_name, value, value_int
+    );
+
+    /* if the menu item has multiple choices defined, it's easy */
+    if (IS_ML_PTR(entry->priv) && entry->choices)
     {
         for (int i = entry->min; i < entry->max; i++)
         {
             if (streq(value, pickbox_string(entry, i)))
             {
+                printf("menu.set('%s', '%s'): pickbox entry #%d\n", entry_name, value, i);
                 *(int*)(entry->priv) = i;
                 return 1;
             }
@@ -6808,47 +6879,74 @@ int menu_set_str_value_from_script(const char* name, const char* entry_name, cha
      * - timeout 2 seconds
      */
     int wait_retries = 0;
-    int tstart = get_ms_clock();
-    for (int i = 0; get_ms_clock() - tstart < 2000; i++)
+    int wait_after_toggle = 0;
+    int start_time = get_ms_clock();
+    int elapsed_time = 0;
+    for (int i = 0; (elapsed_time = get_ms_clock() - start_time) < 5000; i++)
     {
+        if (wait_after_toggle)
+        {
+            /* maybe we need to wait for other tasks? */
+            int delay = (elapsed_time < 2000) ? 200 :
+                        (elapsed_time < 4000) ? 50  : 10;
+            //~ printf("menu.set('%s', '%s'): wait for %d ms\n", entry_name, value, delay);
+            msleep(delay);
+        }
+
         char* current = menu_get_str_value_from_script_do(name, entry_name, &info);
+        //~ printf("menu.set('%s', '%s'): current '%s'\n", entry_name, value, current);
+
         if (streq(current, value))
         {
-            //~ printf("menu_set('%s', '%s'): match str (%s)\n", entry_name, value, current);
+            printf("menu.set('%s', '%s'): matched string (%s)\n", entry_name, value, current);
             goto ok; // success!!
         }
 
         /* optional argument to allow numeric match? */
         if (value_int != INT_MIN && IS_ML_PTR(entry->priv) && CURRENT_VALUE == value_int)
         {
-            //~ printf("menu_set('%s', '%s'): match int (%d, %s)\n", entry_name, value, value_int, current);
+            printf("menu.set('%s', '%s'): matched integer (%d, %s)\n", entry_name, value, value_int, current);
             goto ok; // also success!
         }
 
+        /* boolean match with "ON" ? */
+        if (streq(value, "ON") && IS_ML_PTR(entry->priv) && CURRENT_VALUE != 0)
+        {
+            printf("menu.set('%s', '%s'): matched boolean ('%s')\n", entry_name, value, current);
+            goto ok; // also success!
+        }
+
+        /* boolean match with "OFF" ? */
+        if (streq(value, "OFF") && IS_ML_PTR(entry->priv) && CURRENT_VALUE == 0)
+        {
+            printf("menu.set('%s', '%s'): matched boolean ('%s')\n", entry_name, value, current);
+            goto ok; // also success!
+        }
+    
         /* accept 3500 instead of 3500K, or ON instead of ON,blahblah
          * but not 160 instead of 1600, or 1m instead of 1m10s */
         int len_val = strlen(value);
         int len_cur = strlen(current);
         if (len_val < len_cur && startswith(current, value))
         {
-            /* comma after the requested value? ok, assume separator */
-            if (current[len_val] == ',')
+            /* comma or space after the requested value? ok, assume separator */
+            if (current[len_val] == ',' || current[len_val] == ' ')
             {
-                //~ printf("menu_set('%s', '%s'): match comma (%s)\n", entry_name, value, current);
+                printf("menu.set('%s', '%s'): matched separator (%s)\n", entry_name, value, current);
                 goto ok;
             }
             
             /* requested 10, got 10m? accept (but refuse 105) */
             if (len_cur == len_val + 1 && !isdigit(current[len_val]))
             {
-                //~ printf("menu_set('%s', '%s'): match 1-chr suffix (%s)\n", entry_name, value, current);
+                printf("menu.set('%s', '%s'): matched 1-char suffix (%s)\n", entry_name, value, current);
                 goto ok;
             }
 
             /* requested 10, got 10cm? accept (but refuse 10.5) */
             if (len_cur == len_val + 2 && !isdigit(current[len_val]) && !isdigit(current[len_val+1]))
             {
-                //~ printf("menu_set('%s', '%s'): match 2-chr suffix (%s)\n", entry_name, value, current);
+                printf("menu.set('%s', '%s'): matched 2-char suffix (%s)\n", entry_name, value, current);
                 goto ok;
             }
         }
@@ -6858,27 +6956,30 @@ int menu_set_str_value_from_script(const char* name, const char* entry_name, cha
             if (wait_retries < 5)
             {
                 /* we may need to wait for other tasks */
-                //~ printf("menu_set('%s', '%s'): wait (%s, %d)\n", entry_name, value, current, retries);
+                //~ printf("menu.set('%s', '%s'): wait (%s, %d)\n", entry_name, value, current, wait_retries);
                 msleep(100);
                 wait_retries++;
                 /* check the current string again */
                 continue;
             }
-            
-            printf("menu_set('%s', '%s'): value not changing (%s)\n", entry_name, value, current);
+
+            printf("menu.set('%s', '%s'): value not changing (%s)\n", entry_name, value, current);
             break;
         }
         
         if (i > 0 && streq(current, first)) // back to first value? stop here
         {
-            printf("menu_set('%s', '%s'): back to first value (%s)\n", entry_name, value, current);
+            if (!wait_after_toggle)
+            {
+                /* we may need to wait for other tasks */
+                printf("menu.set('%s', '%s'): let's try once more\n", entry_name, value);
+                wait_after_toggle = 1;
+                i = -1;
+                continue;
+            }
+
+            printf("menu.set('%s', '%s'): back to first value (%s)\n", entry_name, value, current);
             break;
-        }
-        
-        // for debugging, print this always
-        if (i > 50 && i % 10 == 0) // it's getting fishy, maybe it's good to show some progress
-        {
-            printf("menu_set('%s', '%s') [%d]: trying %s (%d), was %s...\n", entry_name, value, i, current, CURRENT_VALUE, last);
         }
 
         snprintf(last, sizeof(last), "%s", current);
@@ -6887,15 +6988,13 @@ int menu_set_str_value_from_script(const char* name, const char* entry_name, cha
         if (entry->select)
         {
             /* custom menu selection logic */
+            //~ printf("menu.set('%s', '%s'): custom select\n", entry_name, value);
             entry->select( entry->priv, 1);
             /* fixme: will crash in file_man */
-
-            /* the custom logic might rely on other tasks to update */
-            msleep(50);
         }
         else if IS_ML_PTR(entry->priv)
         {
-            if (entry->max - entry->min > 1000)
+            if (entry->max - entry->min > (wait_after_toggle ? 100 : 100000))
             {
                 /* for very long min-max ranges, don't try every single value */
                 menu_numeric_toggle_fast(entry->priv, 1, entry->min, entry->max, entry->unit, entry->edit_mode, 1);
@@ -6913,15 +7012,19 @@ int menu_set_str_value_from_script(const char* name, const char* entry_name, cha
         }
         else
         {
-            printf("menu_set('%s', '%s') don't know how to toggle\n", entry_name, value);
+            printf("menu.set('%s', '%s'): don't know how to toggle\n", entry_name, value);
             break;
         }
     }
-    printf("Could not set value '%s' for menu %s -> %s\n", value, name, entry_name);
+
+    printf("menu.set('%s', '%s'): giving up after %d ms\n", entry_name, value, elapsed_time);
     give_semaphore(menu_sem);
     return 0; // boo :(
 
 ok:
+    if (elapsed_time > 1000) {
+        printf("menu.set('%s', '%s'): took %d ms\n", entry_name, value, elapsed_time);
+    }
     give_semaphore(menu_sem);
     return 1; // :)
 }

@@ -24,6 +24,7 @@
 /* "Malloc Information" */
 #define MALLOC_STRUCT 0x42358                    // from get_malloc_info, helper of malloc_info
 #define MALLOC_FREE_MEMORY (MEM(MALLOC_STRUCT + 8) - MEM(MALLOC_STRUCT + 0x1C)) // "Total Size" - "Allocated Size"
+#define SRM_BUFFER_SIZE 0x296c000   /* print it from srm_malloc_cbr */
 
 /* high confidence */
 #define DRYOS_ASSERT_HANDLER        0x260b4               // from debug_assert function, hard to miss
@@ -87,7 +88,6 @@
   #define AUDIO_MONITORING_HEADPHONES_CONNECTED 0
 #define INFO_BTN_NAME               "INFO"
 #define Q_BTN_NAME                  "Q/SET"
-#define ARROW_MODE_TOGGLE_KEY       "FUNC"
 
   #define MIN_MSLEEP 11
   #define PLAY_MODE (gui_state == GUISTATE_PLAYMENU && CURRENT_GUI_MODE == GUIMODE_PLAY)
