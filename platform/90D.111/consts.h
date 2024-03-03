@@ -140,7 +140,8 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define AUDIO_MONITORING_HEADPHONES_CONNECTED 0
 #define INFO_BTN_NAME "INFO"
 #define Q_BTN_NAME "Q/SET"
-#define ARROW_MODE_TOGGLE_KEY "FUNC"
+// Disabled to to "../../src/menuindex.c:128:6: error: #error Please remove unused definition of ARROW_MODE_TOGGLE_KEY."
+//#define ARROW_MODE_TOGGLE_KEY "FUNC"
 
 // "SDPowerOn" / "SDPowerOff", passed to DryosDebugMsg in a function
 // that changes states for several devices (presumably not all LEDs?).
