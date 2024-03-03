@@ -31,9 +31,9 @@
 NSTUB(ROMBASEADDR, firmware_entry)
 THUMB_FN(0xe0040104,  cstart) /* calls bzero32 and create_init_task(..., init_task, ...)  MFD: PROBABLY SAME */
 THUMB_FN(0xe05cd190,  bzero32)/* zeros out a data structure  MFD:UPDATED WITH NEW VALUE*/
-THUMB_FN(0xe0363018,  create_init_task)   /* low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
-THUMB_FN(0xe0040236,  init_task)  /* (Confirmed): USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc*/
-THUMB_FN(0xe05cbd9c,  dcache_clean)   /* loop with MCR p15 c7,c10,1; DSB */
+THUMB_FN(0xe0363018,  create_init_task)   /* (Matches to a func): low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
+THUMB_FN(0xe0040236,  init_task)  /* (Updated for 90D): USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc*/
+THUMB_FN(0xe05cbd9c,  dcache_clean)   /* (Matches to a func) loop with MCR p15 c7,c10,1; DSB */
 // Let's use e05cbd9c, that's the one called by firmware_entry, which is what 850d uses.
 // They do look the same though.
 THUMB_FN(0xe05cbe70,  icache_invalidate)  /* loop with MCR p15 c7,c5,1; c7,c1,6; c7,c1,0; ISB   MFD:UPDATED WITH NEW VALUE*/
@@ -46,88 +46,77 @@ DATA_PTR(0x1028,  current_task)   /* from task_create; pointer to the current ta
 DATA_PTR(0x1010,  current_interrupt)  /* from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
 
 /** Dumper **/
-THUMB_FN(0xe0222804,  dump_file)  /* (Confirmed): tries to save a file to either "A:/%s" or "B:/%s"; calls FIO_RemoveFile/CreateFile/WriteFile/CloseFile/Flush MFD: UPDATED WITH NEW VALUE**/
+THUMB_FN(0xe0222804,  dump_file)  /* (Updated for 90D): tries to save a file to either "A:/%s" or "B:/%s"; calls FIO_RemoveFile/CreateFile/WriteFile/CloseFile/Flush MFD: UPDATED WITH NEW VALUE**/
 
 /** Memory info **/
-THUMB_FN(0xe018c13c,  malloc_info)/* (Confirmed): Malloc Information */
-THUMB_FN(0xe018c1d4,  sysmem_info)/* (Confirmed): System Memory Information */
-THUMB_FN(0xe017f194,  memmap_info)/* (Confirmed): Exception vector, DRYOS system memory etc */
-THUMB_FN(0xe011bbb0,  smemShowFix)/* (Confirmed): Common Lower, Common Upper etc */
+THUMB_FN(0xe018c13c,  malloc_info)/* (Updated for 90D): Malloc Information */
+THUMB_FN(0xe018c1d4,  sysmem_info)/* (Updated for 90D): System Memory Information */
+THUMB_FN(0xe017f194,  memmap_info)/* (Updated for 90D): Exception vector, DRYOS system memory etc */
+THUMB_FN(0xe011bbb0,  smemShowFix)/* (Updated for 90D): Common Lower, Common Upper etc */
+
+/** Everything after this until noted otherwise is at offset +0xE4 compared to 850D. **/
 
 /** Memory allocation **/
-THUMB_FN(0xe05bcd74, _AllocateMemory)  /*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05bcf2c, _FreeMemory)		/*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05bcbfe,  GetMemoryInformation)   /* called from AllocateMemory MFD: UPDATED WITH POSSIBLE ENTRY  */
-THUMB_FN(0xe05bcbd2,  GetSizeOfMaxRegion)/*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05bc818, _alloc_dma_memory)			/*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05bc81e, _free_dma_memory)			/*MFD: UPDATED WITH POSSIBLE ENTRY */
-#THUMB_FN(0xE0693B23,  malloc)
-#THUMB_FN(0xE0693B5B,  free)
+THUMB_FN(0xe05bce58, _AllocateMemory) //JC: Updated
+THUMB_FN(0xe05bd010, _FreeMemory) // JC: Updated
+THUMB_FN(0xe05bcce2,  GetMemoryInformation) // JC: Updated
+THUMB_FN(0xe05bccb6,  GetSizeOfMaxRegion) //JC: Updated
+THUMB_FN(0xe05bc8fc, _alloc_dma_memory) //JC: Updated
+THUMB_FN(0xe05bc902, _free_dma_memory) //JC: Updated
+#THUMB_FN(0xe05fa154,  malloc) // JC: complibMemAlloc, not sure where real one is
+#THUMB_FN(0xe05fa1ea,  free) // JC: compilbMemFree, not sure where real one is
 
 /** Debug messages **/
-THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* (Confirmed) lots of debug messages; format string is third argument */
+THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* (Updated for 90D) lots of debug messages; format string is third argument */
 
 /** DMA **/
-THUMB_FN(0xe05f73a2,  dma_memcpy)  /*MFD: UPDATED WITH POSSIBLE ENTRY */
+THUMB_FN(0xe05f7486,  dma_memcpy)  /*MFD: UPDATED WITH POSSIBLE ENTRY */
 
 /** Eventprocs (call by name) **/
-THUMB_FN(0xe05b2f0e,  call)   /* many functions called by name (lv_start, lv_stop etc) */   /*MFD: UPDATED WITH POSSIBLE ENTRY */
+THUMB_FN(0xe05b2ff2,  call)   /* many functions called by name (lv_start, lv_stop etc) */   /*MFD: UPDATED WITH POSSIBLE ENTRY */
 
 /** File I/O **/
-THUMB_FN(0xe05aeb54, _FIO_OpenFile)			/*MFD: UPDATED WITH POSSIBLE ENTRY  */
-THUMB_FN(0xe05aec06, _FIO_CreateFile) /*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05aefde, _FIO_ReadFile)		/*MFD: UPDATED WITH POSSIBLE ENTRY  --low confidence*/
-THUMB_FN(0xe05af190, _FIO_WriteFile) /*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05af0d2,  FIO_SeekSkipFile) /*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05af3ac,  FIO_CloseFile) /*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05b0432, _FIO_CreateDirectory)   /*MFD: UPDATED WITH POSSIBLE ENTRY */
-//THUMB_FN(0xE04BD061,  FIO_FindFirst)
-THUMB_FN(0xe05b088c, _FIO_FindFirstEx)   /*MFD: UPDATED WITH POSSIBLE ENTRY */
-//THUMB_FN(0xE04BD0EF,  FIO_FindNextEx) // SJE this looks like FIO_FindNext to me, not Ex
-THUMB_FN(0xe05b0988,  FIO_FindNextEx)/*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05b0a4a,  FIO_FindClose)		 /*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05af546, _FIO_GetFileSize64)  /*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05aef46, _FIO_RemoveFile)/*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05affaa, _FIO_RenameFile)		/*MFD: UPDATED WITH POSSIBLE ENTRY */
-THUMB_FN(0xe05b0616,  FIO_Flush)   // to be called after FIO_CloseFile? /*MFD: UPDATED WITH POSSIBLE ENTRY */
-//THUMB_FN(0xe05afa10,  FIO_FInfo)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b086e,  FIO_SetErr)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b0798,  FIO_DelayFlush)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b0582,  FIO_RemDir)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b019e,  FIO_Divide)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b00b6,  FIO_Concat)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05afeb0,  FIO_ChopT)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05afdc2,  FIO_ChopH)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05afc30,  FIO_ChgCreateTime)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05afb6e,  FIO_FreeEntCnt)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af95c,  FIO_SetFTime)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af87a,  FIO_GetFTime)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  FIO_SetAttr)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af46c,  FIO_CloseSC)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b0cd2,  FIO_Mount)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b0d64,  FIO_UnMount)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af262,  FIO_ChainW)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05b04d8,  FIO_CreateDirEx)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
-//THUMB_FN(0xe05af73e,  ----)/*MFD: UPDATED WITH POSSIBLE ENTRY added just in case*/
+// +228, 0xE4 offset, updated until next.
+THUMB_FN(0xe05aec38, _FIO_OpenFile)
+THUMB_FN(0xe05aecea, _FIO_CreateFile)
+THUMB_FN(0xe05af0c2, _FIO_ReadFile)
+THUMB_FN(0xe05af274, _FIO_WriteFile)
+THUMB_FN(0xe05af1b6,  FIO_SeekSkipFile)
+THUMB_FN(0xe05af490,  FIO_CloseFile)
+THUMB_FN(0xe05b0516, _FIO_CreateDirectory)
+//THUMB_FN(0xE04BD061,  FIO_FindFirst) // TBD
+THUMB_FN(0xe05b0970, _FIO_FindFirstEx) // "FirstEnt", is it _FIO_FindFirst instead?
+THUMB_FN(0xe05b0a6c,  FIO_FindNextEx) // "FindNext", is it _FIO_FindNext instead?
 
+THUMB_FN(0xe05b0b2e,  FIO_FindClose) // "CloseEnt", not sure
+THUMB_FN(0xe05af62a, _FIO_GetFileSize64) // "AcqSize", not sure
 
+THUMB_FN(0xe05af02a, _FIO_RemoveFile)
+THUMB_FN(0xe05b008e, _FIO_RenameFile)
+THUMB_FN(0xe05b06fa,  FIO_Flush)   // to be called after FIO_CloseFile?
+THUMB_FN(0xe05afaf4,  FIO_FInfo)
+THUMB_FN(0xe05b0952,  FIO_SetErr)
+THUMB_FN(0xe05b087c,  FIO_DelayFlush)
+THUMB_FN(0xe05b0666,  FIO_RemDir)
+THUMB_FN(0xe05b0282,  FIO_Divide)
+THUMB_FN(0xe05b019a,  FIO_Concat)
+THUMB_FN(0xe05aff94,  FIO_ChopT)
+THUMB_FN(0xe05afeb6,  FIO_ChopH)
+THUMB_FN(0xe05afd14,  FIO_ChgCreateTime)
+THUMB_FN(0xe05afc52,  FIO_FreeEntCnt)
+THUMB_FN(0xe05afa40,  FIO_SetFTime)
+THUMB_FN(0xe05af95e,  FIO_GetFTime)
+THUMB_FN(0xe05af822,  FIO_SetAttr)
+THUMB_FN(0xe05af550,  FIO_CloseSC)
+THUMB_FN(0xe05b0db6,  FIO_Mount)
+THUMB_FN(0xe05b0e48,  FIO_UnMount)
+THUMB_FN(0xe05af346,  FIO_ChainW)
+THUMB_FN(0xe05b05bc,  FIO_CreateDirEx)
 
+THUMB_FN(0xe05b078e, FIO_EmgFlush)
+THUMB_FN(0xe05b0930, FIO_DelayRemove) // Prints and then calls FIO_DelayFlush
 
-
-
-
-
-
-
-
+/** Offset end. **/
 
 /** GUI **/
 //THUMB_FN(0xe04044ce,  GUI_Control) // Looks missing on 850D, possibly same as R 
@@ -282,8 +271,8 @@ DATA_PTR(   0x0235b2f4,  winsys_sem)
 
 // These are not strictly required, although recent dev work has added dependencies;
 // these likely should be removed before a "real" release
-THUMB_FN(0xe05b6f74, uart_printf)  //MDF: REPLACED WITH POSSIBLE ENTRY
-#NSTUB(0xdf008c7c, uart_printf) // Thunked equivalent of the above.  Note, ARM, not Thumb.
+THUMB_FN(0xe000be02, uart_printf)  // JC: updated
+#NSTUB(0xdf008c7c, uart_printf) // JC: cannot find. Thunked equivalent of the above.  Note, ARM, not Thumb.
    // Both seem to work the same.
 
 // These are not required, but have been used for experiments, debugging, etc
