@@ -116,21 +116,22 @@ THUMB_FN(0xe05b0930, FIO_DelayRemove) // Prints and then calls FIO_DelayFlush
 /** +0xE4 Offset end. **/
 
 /** GUI **/
-//THUMB_FN(0xe04044ce,  GUI_Control) // JC: same as gui_massive_event_loop | Looks missing on 850D, possibly same as R 
-THUMB_FN(0xe059377e,  SetGUIRequestMode) // JC unsure, Code is quite different from earlier cams, not a big switch? MFD: UPDATED WITH POSSIBLE ENTRY. CODE IS A LITTLE DIFFERENT
+//THUMB_FN(0xe05cc2c4,  GUI_Control) // JC: unsure | Looks missing on 850D, possibly same as R 
+THUMB_FN(0xe059377e,  SetGUIRequestMode) // JC unsure | Code is quite different from earlier cams, not a big switch? MFD: UPDATED WITH POSSIBLE ENTRY. CODE IS A LITTLE DIFFERENT
  // Possibly weird decomp?  Param is the same though, maybe it still works
 THUMB_FN(0xe057c68c,  gui_init_end) // JC: matched to EndGuiInit | DNE on R, but does on 850D
-THUMB_FN(0xe020b324,  gui_main_task)//JC: matched to GUI.c | MFD: UPDATED WITH POSSIBLE ENTRY
-THUMB_FN(0xe020b376,  gui_enqueue_message) // JC: same as MFD | "warning! QueueLength=%d" MFD: UPDATED WITH POSSIBLE ENTRY LOW CONFIDENCE
+THUMB_FN(0xe020b240,  gui_main_task)//JC: matched to GUI.c | MFD: UPDATED WITH POSSIBLE ENTRY
+THUMB_FN(0xe020b376,  gui_enqueue_message) // "warning! QueueLength=%d" MFD: UPDATED WITH POSSIBLE ENTRY LOW CONFIDENCE
 
 /** GUI timers **/
 THUMB_FN(0xe05a92ce,  CancelTimer) //JC: unsure, is a loop | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
-THUMB_FN(0xe030a2fe,  SetHPTimerAfterNow)		//MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
-THUMB_FN(0xe030a36e,  SetHPTimerNextTick) /* same "worker" function as SetHPTimerAfterNow  MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT*/
-THUMB_FN(0xe05a92fc,  SetTimerAfter)		//MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
-THUMB_FN(0xe06c278a,  CancelDateTimer)//MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
+THUMB_FN(0xe030a2fe,  SetHPTimerAfterNow) // JC: "HPTimer.c" | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
+THUMB_FN(0xe030a36e,  SetHPTimerNextTick) // JC: "HPTimer.c" same "worker" function as SetHPTimerAfterNow  MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT 
+THUMB_FN(0xe05a92fc,  SetTimerAfter) // JC: "Timer1m.c" | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
+THUMB_FN(0xe06c278a,  CancelDateTimer)//JC: Updated for 90D | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
 
 /** Interrupts **/
+// JC: unsure
 //DATA_PTR(0x4030,  pre_isr_hook)
 //DATA_PTR(0x4034,  post_isr_hook)
 //DATA_PTR(   0x6CC10,  isr_table_handler)
@@ -138,14 +139,14 @@ THUMB_FN(0xe06c278a,  CancelDateTimer)//MFD: UPDATED WITH POSSIBLE ENTRY CODE IS
 THUMB_FN(0xe01ab1dc,  cli_spin_lock)  /* used in AllocateMemory/FreeMemory and others */  //MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
 
 /** MPU communication **/
-THUMB_FN(0xe008ba68,  mpu_send) // "InterCom::Siodriver.c" //MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
-THUMB_FN(0xe0641e4c,  mpu_recv) // JC: unsure | "ReceiveCBR : Unknown Command" //MFD: ReceiveCBR : Unknown Command IS THERE, HOWEVER THE CODE IS QUITE DIFFERENT
-DATA_PTR(0x02354930,  mpu_recv_cbr) // JC: unsure | search for Direct Refs to mpu_recv address, function pointer should be found, //MFD: UPDATED WITH POSSIBLE value
+THUMB_FN(0xe008ba68,  mpu_send) // "InterCom::Siodriver.c"
+THUMB_FN(0xe0641f30,  mpu_recv) // JC: +0xE4 from 850D, still unsure though | "ReceiveCBR : Unknown Command" //MFD: ReceiveCBR : Unknown Command IS THERE, HOWEVER THE CODE IS QUITE DIFFERENT
+DATA_PTR(0x02354930,  mpu_recv_cbr) // JC: unchanged | search for Direct Refs to mpu_recv address, function pointer should be found, //MFD: UPDATED WITH POSSIBLE value
 // find the function that uses it, which stores it; address where stored is mpu_recv_cbr
-DATA_PTR(   0x76160,  mpu_send_ring_buffer)  // JC: unsure | ring buffer used in mpu_send //MFD: UPDATED WITH POSSIBLE value
-DATA_PTR( 0x2354924,  mpu_send_ring_buffer_tail) // ring buffer index incremented in mpu_send
-DATA_PTR(   0x76020,  mpu_recv_ring_buffer)  // ring buffer used in SIO3_ISR, subroutine that processes two chars at a time //MFD: UPDATED WITH POSSIBLE
-DATA_PTR( 0x235493c,  mpu_recv_ring_buffer_tail) // ring buffer index incremented in the above subroutine
+DATA_PTR(   0x76160,  mpu_send_ring_buffer)  // JC: unchanged | ring buffer used in mpu_send //MFD: UPDATED WITH POSSIBLE value
+DATA_PTR( 0x2354924,  mpu_send_ring_buffer_tail) // JC: updated | ring buffer index incremented in mpu_send
+DATA_PTR(   0x76020,  mpu_recv_ring_buffer)  // JC: unchanged | ring buffer used in SIO3_ISR, subroutine that processes two chars at a time //MFD: UPDATED WITH POSSIBLE
+DATA_PTR( 0x235493c,  mpu_recv_ring_buffer_tail) // JC: unchanged | ring buffer index incremented in the above subroutine
 
 /** Misc **/
 THUMB_FN(0xe0069bf8,  vsnprintf)  /* called near dmstart; references "01234567", "0123456789", "0123456789abcdef" MFD: UPDATED WITH POSSIBLE ENTRY
@@ -173,10 +174,10 @@ NSTUB(0x234e8ec,  gui_main_struct) // JC: unsure how to proceeed | See function 
 THUMB_FN(0xe05920f2,  DispSensorStart) // 0x86f4 looks to be a bool for whether Sensor is started  //MFD: REPLACED WITH POSSIBLE Entry
 THUMB_FN(0xe05bb824,  DeleteMemorySuite)
 THUMB_FN(0xe05bbab0,  CreateMemorySuite)
-THUMB_FN(0xe05bb012,  CreateMemoryChunk) // called from CreateMemorySuite
+THUMB_FN(0xe05bb0f6,  CreateMemoryChunk) // JC: (+0xE4 from 850D) | called from CreateMemorySuite
 
 //NSTUB(0xe05bb7a6,  GetSizeOfMemorySuite) // not needed, but I found it along the way
-THUMB_FN(0xe05cc0d4,  take_semaphore) // Fairly sure. Same function sig and followed by give_semaphore
+THUMB_FN(0xe05cc0d4,  take_semaphore) // Same function sig and followed by give_semaphore
 THUMB_FN(0xe05cc14e,  give_semaphore)
 THUMB_FN(0xe05cbfd8,  create_named_semaphore) // also see df00b114, very similar, but df008418 is closer to 50D create_named_semaphore.
   // Complicated by there being df00b648, which wraps 8418 with an extra assert possible,
@@ -186,7 +187,7 @@ THUMB_FN(0xe05cbfd8,  create_named_semaphore) // also see df00b114, very similar
 											  //MFD: UPDATED WITH POSSIBLE VALUE
 
 THUMB_FN(0xe04065f4,  gui_change_mode) // GUIGate_PostChangeMode
-THUMB_FN(0xe04044ce,  gui_massive_event_loop) // various "GUICMD_"* strings
+THUMB_FN(0xe04044ce,  gui_massive_event_loop) //  various "GUICMD_"* strings
 //THUMB_FN(0x,  gui_init_event) // JC: ? | "-> handleGuiInit"
 
 // The various memory functions can't be found by debug_assert strings in 850D
@@ -205,9 +206,6 @@ THUMB_FN(0xe05b2d08,  msg_queue_receive) // "SystemIF::KerQueue.c" useful for fi
 
 
 THUMB_FN(0xe05b2e66,  msg_queue_post) // used in gui_enqueue_message  MFD: REPLACED WITH POSSIBLE Entry
-
-// jc up to here
-
 THUMB_FN(0xe05b2e9c,  msg_queue_count) // Fairly hard to find.  Often used near DispLockStop, which is easy to find
    // and not used often.
 THUMB_FN(0xe05b2c44,  msg_queue_create) // CreateMessageQueue - In 50D, msg_queue_create calls 0xff866424,
@@ -238,10 +236,10 @@ THUMB_FN(0xe05519ec,  SRM_FreeMemoryResourceFor1stJob) // JC: unsure for 90D | f
    // this is my best guess - this one has pPriorMessage and sets offset 8
    // in the struct to 0, offset 0x10 to param1
 														 //  MDF: REPLACED WITH POSSIBLE ENTRY
-THUMB_FN(0xe05be040, _prop_cleanup) // "./Multicast/PropertyMgr.c" check funcs that ref this string
-THUMB_FN(0xe05cb688,  CreateRecursiveLock) // via "KerRLock.c", CRL() calls a function that regs this string, not many do
-THUMB_FN(0xe05a955c, AcquireRecursiveLock)
-THUMB_FN(0xe05a9626,  ReleaseRecursiveLock)
+THUMB_FN(0xe05be040, _prop_cleanup) // JC: incorrect | "./Multicast/PropertyMgr.c" check funcs that ref this string
+THUMB_FN(0xe05cb688,  CreateRecursiveLock) // JC: incorrect, takes int arg. | via "KerRLock.c", CRL() calls a function that regs this string, not many do
+THUMB_FN(0xe05a955c, AcquireRecursiveLock) // JC: incorrect, two params.
+THUMB_FN(0xe05a9626,  ReleaseRecursiveLock) // JC: possibly correct, sig matches
 THUMB_FN(0xe059758e,  dialog_redraw) // JC: unsure | Found via checking xrefs to "pDialog->pSignature == pcSignature"  //MDF: REPLACED WITH POSSIBLE ENTRY
 //THUMB_FN(0xe04b3739,  CreateResLockEntry) // JC: untouched | via xrefs to a pointer to "ResInfo"
 //THUMB_FN(0xe04b3b59,  LockEngineResources) // JC: untouched | Down a bit from CreateResLockEntry, start v similar but end is different.
@@ -253,19 +251,19 @@ THUMB_FN(0x0,  fsuDecodePartitionTable)
   // Seems to always be "idle" task.
   // (we don't use this, but instead calculate it during early init,
   //  to save backporting this stub for all older cams)
-NSTUB( 0x234d67c,  task_max) // JC: untouched
-NSTUB(0x0235b190,  gui_task_list) // JC: untouched | Strings have changed or been removed compared to earlier cams.  //MDF: REPLACED WITH POSSIBLE ENTRY
+NSTUB( 0x234d67c,  task_max) // JC: untouched, incorrect
+NSTUB(0x0235b190,  gui_task_list) // JC: untouched, incorrect | Strings have changed or been removed compared to earlier cams.  //MDF: REPLACED WITH POSSIBLE ENTRY
    // Found via checking all call sites of CreateRecursiveLock()
    // and comparing with 200d until similar code found.
    // gui_task_list is lock related
-THUMB_FN(0xe083c674, _LoadCalendarFromRTC)  //JC: untouched | MDF: REPLACED WITH POSSIBLE ENTRY
+THUMB_FN(0xe083c674, _LoadCalendarFromRTC)  //JC: untouched, incorrect | MDF: REPLACED WITH POSSIBLE ENTRY
  
 
 // These are required on Digic 678
-THUMB_FN(0xe02c08ec, RefreshVrmsSurface) // "Call RefreshVrmsSurface" / "XimrExe"
-DATA_PTR(   0x0235b308,  display_refresh_needed) // if 0, RefreshVrmsSurface() does nothing
+THUMB_FN(0xe02c08ec, RefreshVrmsSurface) // jc: corr | "Call RefreshVrmsSurface" / "XimrExe"
+DATA_PTR(   0x0235b308,  display_refresh_needed) // jc: corr | if 0, RefreshVrmsSurface() does nothing
 THUMB_FN(0xe0194248, XimrExe) // JC: maps to func | trigger Ximr unit to execute (HW compositor, partially understood)
-DATA_PTR(   0x0235b2f4,  winsys_sem)
+DATA_PTR(   0x0235b2f4,  winsys_sem) // JC: seems corr
 
 // These are not strictly required, although recent dev work has added dependencies;
 // these likely should be removed before a "real" release
@@ -301,7 +299,7 @@ THUMB_FN(0xe000be02, uart_printf)  // JC: updated
 // you can see fd70 + 0x14, 0x18, 0x1c being used to see which vram buffer
 // is active, or ready maybe.
 
-DATA_PTR( 0x235b2bc,  _rgb_vram_info) // Used in many places, written to in "InitializeScreen"
+DATA_PTR( 0x235b2bc,  _rgb_vram_info) // JC: looks corr, Used in many places, written to in "InitializeScreen"
  // At least for 200D, this is BGRA buffer, earlier in the render
  // chain than the YUV ones.  But, changes made to it will not
  // render until a refresh occurs (can manually trigger via RefreshVrmsSurface()),
@@ -311,15 +309,15 @@ DATA_PTR( 0x235b2bc,  _rgb_vram_info) // Used in many places, written to in "Ini
 NSTUB(0x0,  LCD_Palette) // Not required / changed in D8
  // FIXME - presumably we should stop using this stub in source?
 
-DATA_PTR( 0x234d6b8,  task_dispatch_hook) // find usage in 200D, trace up call hierarchy to task_create,
+DATA_PTR( 0x234d6b8,  task_dispatch_hook) // JC: incorr? | find usage in 200D, trace up call hierarchy to task_create,
   // trace back down same hierarchy in 850D
-THUMB_FN(0xe05bda80, _prop_request_change)  //MFD: REPLACED WITH POSSIBLE Entry
-THUMB_FN(0xe05cc7de,  dm_set_store_level) // called by "dmstore"
+THUMB_FN(0xe05bda80, _prop_request_change)  //JC: ?? | MFD: REPLACED WITH POSSIBLE Entry
+THUMB_FN(0xe05cc7de,  dm_set_store_level) // JC: ?? | called by "dmstore"
   // Called in init_task(), shortly before ICU Firmware version string
 										  //  MFD: REPLACED WITH POSSIBLE Entry  under "[DM] Priority Escalation!!!!"
 										  //  MFD: REPLACED WITH POSSIBLE Entry  under "[DM] Priority Escalation!!!!"
   // is logged.
-THUMB_FN(0xe00b08dc,  task_trampoline)   //  MFD: REPLACED WITH POSSIBLE Entry
+THUMB_FN(0xe00b08dc,  task_trampoline)   //  JC. not a func | MFD: REPLACED WITH POSSIBLE Entry
 
 
 //JC: not validated
