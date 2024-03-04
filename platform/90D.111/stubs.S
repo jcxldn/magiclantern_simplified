@@ -29,11 +29,11 @@
 
 /** Startup **/
 NSTUB(ROMBASEADDR, firmware_entry)
-THUMB_FN(0xe00401e8,  cstart) /* JC unsure, matches to a function | calls bzero32 and create_init_task(..., init_task, ...)  MFD: PROBABLY SAME */
+THUMB_FN(0xe0040104,  cstart) /* JC updated (-e4 from 850D) | calls bzero32 and create_init_task(..., init_task, ...)  MFD: PROBABLY SAME */
 THUMB_FN(0xe05cd274,  bzero32)/* zeros out a data structure  MFD:UPDATED WITH NEW VALUE*/
 THUMB_FN(0xe0363018,  create_init_task)   /* JC unsure, matches to a func | low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
 THUMB_FN(0xe0040236,  init_task)  /* (Updated for 90D): USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc*/
-THUMB_FN(0xe05cbd9c,  dcache_clean) /* JC unsure, matches to a func | loop with MCR p15 c7,c10,1; DSB */
+THUMB_FN(0xe05cbe80,  dcache_clean) /* JC updated (+e4 from 850D)| loop with MCR p15 c7,c10,1; DSB */
 // Let's use e05cbd9c, that's the one called by firmware_entry, which is what 850d uses.
 // They do look the same though.
 THUMB_FN(0xe05cbf54,  icache_invalidate)  /* JC unsure, matches to a func | loop with MCR p15 c7,c5,1; c7,c1,6; c7,c1,0; ISB   MFD:UPDATED WITH NEW VALUE*/
