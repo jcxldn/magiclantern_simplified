@@ -29,7 +29,7 @@
 
 /** Startup **/
 NSTUB(ROMBASEADDR, firmware_entry)
-THUMB_FN(e00401e8,  cstart) /* JC unsure, matches to a function | calls bzero32 and create_init_task(..., init_task, ...)  MFD: PROBABLY SAME */
+THUMB_FN(0xe00401e8,  cstart) /* JC unsure, matches to a function | calls bzero32 and create_init_task(..., init_task, ...)  MFD: PROBABLY SAME */
 THUMB_FN(0xe05cd274,  bzero32)/* zeros out a data structure  MFD:UPDATED WITH NEW VALUE*/
 THUMB_FN(0xe0363018,  create_init_task)   /* JC unsure, matches to a func | low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
 THUMB_FN(0xe0040236,  init_task)  /* (Updated for 90D): USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc*/
@@ -41,7 +41,7 @@ THUMB_FN(0xe05cbf54,  icache_invalidate)  /* JC unsure, matches to a func | loop
 /** Tasks **/
 THUMB_FN(0xe064270a,  task_create) /* JC unsure, matches to a func | used to start TaskMain, GuiMainTask etc MFD: UPDATED WITH POSSIBLE ENTRY */
 //THUMB_FN(0xdf008f0b,  task_create_ex) /* as task_create, but allows selecting CPU for task*/
-// JC unsure - matches to a func THUMB_FN(0xe05bc4f2,  msleep) /* argument is always multiple of 10  MFD: UPDATED WITH POSSIBLE ENTRY */
+THUMB_FN(0xe05bc4f2,  msleep) /* JC unsure - matches to a func | argument is always multiple of 10  MFD: UPDATED WITH POSSIBLE ENTRY */
 DATA_PTR(0x1028,  current_task)   /* from task_create; pointer to the current task structure   MFD: possibly same */
 DATA_PTR(0x1010,  current_interrupt)  /* from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
 
@@ -119,7 +119,7 @@ THUMB_FN(0xe05b0930, FIO_DelayRemove) // Prints and then calls FIO_DelayFlush
 /** Offset end. **/
 
 /** GUI **/
-THUMB_FN(0xe04044ce,  GUI_Control) // JC: same as gui_massive_event_loop | Looks missing on 850D, possibly same as R 
+//THUMB_FN(0xe04044ce,  GUI_Control) // JC: same as gui_massive_event_loop | Looks missing on 850D, possibly same as R 
 THUMB_FN(0xe059377e,  SetGUIRequestMode) // JC unsure, Code is quite different from earlier cams, not a big switch? MFD: UPDATED WITH POSSIBLE ENTRY. CODE IS A LITTLE DIFFERENT
  // Possibly weird decomp?  Param is the same though, maybe it still works
 THUMB_FN(0xe057c68c,  gui_init_end) // JC: matched to EndGuiInit | DNE on R, but does on 850D
@@ -217,11 +217,11 @@ THUMB_FN(0xe05b2c44,  msg_queue_create) // CreateMessageQueue - In 50D, msg_queu
 // the equiv of which is 0xdf00b114 (and was easier to find) MDF: REPLACED WITH POSSIBLE ENTRY
 THUMB_FN(0xe05bdf8c,  prop_deliver) // used near "UNKNOWN PROPERTY ID " in call to DryosDebugMsg
 THUMB_FN(0xe05bda96,  prop_register_slave)
-// DATA_PTR( 0x23585b4,  LiveViewApp_dialog) // JC, seems incorrect | in StartLiveViewApp()
+DATA_PTR( 0x23585b4,  LiveViewApp_dialog) // JC, seems incorrect | in StartLiveViewApp()
 THUMB_FN(0xe044ffae,  LiveViewApp_handler) // DebugMsg: "StartLiveViewApp(%#x)", address passed to CreateDialogBox
 THUMB_FN(0xe07a3cb4,  LiveViewShutterApp_handler) // DebugMsg: "StartLiveViewShutterApp", address passed to CreateDialogBox
 THUMB_FN(0xe032c392,  PlayMovieGuideApp_handler) // "PlayMovieGuide_Start"
-// THUMB_FN(0xe0560144,  PlayMain_handler) // JC: unsure DebugMsg: "StartPlayMain", address passed to CreateDialogBox
+THUMB_FN(0xe0560144,  PlayMain_handler) // JC: unsure, incorrect? | DebugMsg: "StartPlayMain", address passed to CreateDialogBox
 THUMB_FN(0xe0704b12,  ShootOlcApp_handler) // near "StopShootOlcApp PopPalette(%d)" MFD: REPLACED WITH POSSIBLE Entry
 THUMB_FN(0xe08dd04e,  GetCFnData) // JC: unsure | "GetCFnData" Function sig is different but the body looks similar.  MFD: REPLACED WITH POSSIBLE Entry
   // Looks like the inner functions use registers the outer doesn't, which confuses Ghidra
