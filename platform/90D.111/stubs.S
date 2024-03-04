@@ -29,21 +29,19 @@
 
 /** Startup **/
 NSTUB(ROMBASEADDR, firmware_entry)
-THUMB_FN(0xe0040104,  cstart) /* JC updated (-e4 from 850D) | calls bzero32 and create_init_task(..., init_task, ...)  MFD: PROBABLY SAME */
-THUMB_FN(0xe05cd274,  bzero32)/* zeros out a data structure  MFD:UPDATED WITH NEW VALUE*/
+THUMB_FN(0xe0040104,  cstart) /* JC updated (-e4 from 850D) | calls bzero32 and create_init_task(..., init_task, ...) */
+THUMB_FN(0xe05cd274,  bzero32)/* zeros out a data structure */
 THUMB_FN(0xe0363018,  create_init_task)   /* JC unsure, matches to a func | low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
 THUMB_FN(0xe0040236,  init_task)  /* (Updated for 90D): USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc*/
 THUMB_FN(0xe05cbe80,  dcache_clean) /* JC updated (+e4 from 850D)| loop with MCR p15 c7,c10,1; DSB */
-// Let's use e05cbd9c, that's the one called by firmware_entry, which is what 850d uses.
-// They do look the same though.
 THUMB_FN(0xe05cbf54,  icache_invalidate)  /* JC unsure, matches to a func | loop with MCR p15 c7,c5,1; c7,c1,6; c7,c1,0; ISB   MFD:UPDATED WITH NEW VALUE*/
 
 /** Tasks **/
-THUMB_FN(0xe064270a,  task_create) /* JC unsure, matches to a func | used to start TaskMain, GuiMainTask etc MFD: UPDATED WITH POSSIBLE ENTRY */
+THUMB_FN(0xe064270a,  task_create) /* used to start TaskMain, GuiMainTask etc */
 //THUMB_FN(0xdf008f0b,  task_create_ex) /* as task_create, but allows selecting CPU for task*/
 THUMB_FN(0xe05bc4f2,  msleep) /* JC unsure - matches to a func | argument is always multiple of 10  MFD: UPDATED WITH POSSIBLE ENTRY */
-DATA_PTR(0x1028,  current_task)   /* from task_create; pointer to the current task structure   MFD: possibly same */
-DATA_PTR(0x1010,  current_interrupt)  /* from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
+DATA_PTR(0x1028,  current_task)   /* JC: untouched | from task_create; pointer to the current task structure   MFD: possibly same */
+DATA_PTR(0x1010,  current_interrupt)  /* JC: untouched | from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
 
 /** Dumper **/
 THUMB_FN(0xe0222804,  dump_file)  /* (Updated for 90D): tries to save a file to either "A:/%s" or "B:/%s"; calls FIO_RemoveFile/CreateFile/WriteFile/CloseFile/Flush MFD: UPDATED WITH NEW VALUE**/
@@ -76,7 +74,6 @@ THUMB_FN(0xe05f7486,  dma_memcpy)
 THUMB_FN(0xe05b2ff2,  call)   /* JC unsure, seems correct? | many functions called by name (lv_start, lv_stop etc) */
 
 /** File I/O **/
-// +228, 0xE4 offset, updated until next.
 THUMB_FN(0xe05aec38, _FIO_OpenFile)
 THUMB_FN(0xe05aecea, _FIO_CreateFile)
 THUMB_FN(0xe05af0c2, _FIO_ReadFile)
@@ -116,7 +113,7 @@ THUMB_FN(0xe05b05bc,  FIO_CreateDirEx)
 THUMB_FN(0xe05b078e, FIO_EmgFlush)
 THUMB_FN(0xe05b0930, FIO_DelayRemove) // Prints and then calls FIO_DelayFlush
 
-/** Offset end. **/
+/** +0xE4 Offset end. **/
 
 /** GUI **/
 //THUMB_FN(0xe04044ce,  GUI_Control) // JC: same as gui_massive_event_loop | Looks missing on 850D, possibly same as R 
