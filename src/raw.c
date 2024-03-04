@@ -26,6 +26,7 @@
 #include "lens.h"
 #include "module.h"
 #include "menu.h"
+#include "edmac.h"
 #include "edmac-memcpy.h"
 #include "imgconv.h"
 #include "console.h"
@@ -71,9 +72,22 @@ static int (*dual_iso_get_dr_improvement)() = MODULE_FUNCTION(dual_iso_get_dr_im
 
 /*********************** Camera-specific constants ****************************/
 
+// SJE this section used to have LV buffer and EDMAC related things,
+// ifdef'd per cam.  That was a bad idea, so I've moved them into platform/XXD.
+//
+// More of the later stuff (e.g. CAM_COLORMATRIX) should also move to be per
+// cam.  But for now, I'm just touching EDMAC related code.
+#if defined(RAW_LV_EDMAC)
+    #error "RAW_LV_EDMAC has been retired.  See RAW_LV_EDMAC_CHANNEL_ADDR"
+#endif
+
 #ifdef CONFIG_EDMAC_RAW_SLURP
-/* undefine so we don't use it by mistake */
-#undef RAW_LV_EDMAC
+    #if defined(RAW_LV_EDMAC_CHANNEL_ADDR)
+        // avoid using bad value for RAW_LV_EDMAC_CHANNEL_ADDR, shouldn't be
+        // used with RAW_SLURP
+        // (SJE don't know if this can happen, modernising old guard)
+        #error "RAW_LV_EDMAC_CHANNEL_ADDR shouldn't be defined at this point"
+    #endif
 
 /* hardcode Canon's raw buffer directly */
 /* you can find it from lv_raw_dump, arg1 passed to dump_file:
@@ -97,66 +111,6 @@ static int (*dual_iso_get_dr_improvement)() = MODULE_FUNCTION(dual_iso_get_dr_im
 // NB: instructions not tested with current code...  If they work,
 // please remove this part of the comment.
 
-#ifdef CONFIG_60D
-#define DEFAULT_RAW_BUFFER MEM(MEM(0x5028))
-#define DEFAULT_RAW_BUFFER_SIZE (0x49F00000 - 0x48332200)   /* ~28MB, really? */
-#endif
-
-#ifdef CONFIG_600D
-#define DEFAULT_RAW_BUFFER MEM(MEM(0x51FC))
-#endif
-
-#ifdef CONFIG_5D3_113
-/* MEM(0x2600C + 0x2c) = 0x4B152000; appears free until 0x4CE00000 */
-#define DEFAULT_RAW_BUFFER MEM(0x2600C + 0x2c)
-#define DEFAULT_RAW_BUFFER_SIZE (0x4CDF0000 - 0x4B152000)
-#endif
-
-#ifdef CONFIG_5D3_123
-/* MEM(0x25f1c + 0x34) (0x4d31a000) is used near 0x4d600000 in photo mode
- * that's probably just because the memory layout changes
- * next buffer is at 0x4ee00000; can we assume it can be safely reused by us?
- * (Free Memory dialog, memory map with CONFIG_MARK_UNUSED_MEMORY_AT_STARTUP)
- */
-#define DEFAULT_RAW_BUFFER MEM(0x25f1c + 0x34)
-#define DEFAULT_RAW_BUFFER_SIZE (0x4e000000 - 0x4d31a000)
-#endif
-
-#ifdef CONFIG_650D
-#define DEFAULT_RAW_BUFFER MEM(0x25B00 + 0x3C)
-#define DEFAULT_RAW_BUFFER_SIZE (0x47F00000 - 0x46798080)
-#endif
-
-#ifdef CONFIG_700D
-#define DEFAULT_RAW_BUFFER MEM(0x25B0C + 0x3C)
-#define DEFAULT_RAW_BUFFER_SIZE (0x47F00000 - 0x46798080)
-#endif
-
-#ifdef CONFIG_EOSM
-#define DEFAULT_RAW_BUFFER MEM(0x404E4 + 0x44)
-#define DEFAULT_RAW_BUFFER_SIZE (0x47F00000 - 0x46798080)
-#endif
-
-#ifdef CONFIG_6D
-#define DEFAULT_RAW_BUFFER MEM(0x76d6c + 0x2C)
-#define DEFAULT_RAW_BUFFER_SIZE (0x4CFF0000 - 0x4B328000)
-#endif
-
-#ifdef CONFIG_70D
-#define DEFAULT_RAW_BUFFER MEM(0x7CFEC + 0x30)
-#define DEFAULT_RAW_BUFFER_SIZE (0x4CFF0000 - 0x4B328000)
-#endif
-
-#ifdef CONFIG_100D
-#define DEFAULT_RAW_BUFFER MEM(0x6733C + 0x40)
-#define DEFAULT_RAW_BUFFER_SIZE (0x46CC0000 - 0x46798100)
-#endif
-
-#ifdef CONFIG_1100D
-#define DEFAULT_RAW_BUFFER MEM(MEM(0x4C64))     /* how much do we have allocated? */
-#define DEFAULT_RAW_BUFFER_SIZE 8*1024*1024     /* is this really overwritten by other code? needs some investigation */
-#endif
-
 #ifndef DEFAULT_RAW_BUFFER_SIZE
 /* todo: figure out how much Canon code allocates for their LV RAW buffer - how? */
 #pragma message "FIXME: using dummy DEFAULT_RAW_BUFFER_SIZE"
@@ -169,25 +123,21 @@ static int (*dual_iso_get_dr_improvement)() = MODULE_FUNCTION(dual_iso_get_dr_im
 #define CONFIG_ALLOCATE_RAW_LV_BUFFER
 #define RAW_LV_BUFFER_ALLOC_SIZE (SRM_BUFFER_SIZE - 0x1000)
 
-
 #else // "Traditional" RAW LV buffer detection (no CONFIG_EDMAC_RAW_SLURP)
 
 /**
  * LiveView raw buffer address
  * To find it, call("lv_save_raw") and look for an EDMAC channel that becomes active (Debug menu)
  **/
-
-#if defined(CONFIG_5D2) || defined(CONFIG_50D)
-#define RAW_LV_EDMAC 0xC0F04508
-#endif
-
-#if defined(CONFIG_500D) || defined(CONFIG_550D) || defined(CONFIG_7D)
-#define RAW_LV_EDMAC 0xC0F26008
-#endif
-
-#if defined(CONFIG_DIGIC_V) || defined(CONFIG_600D) || defined(CONFIG_60D)
+#if !defined(RAW_LV_EDMAC_CHANNEL_ADDR) && defined(CONFIG_DIGIC_V)
 /* probably all new cameras use this address */
-#define RAW_LV_EDMAC 0xC0F26208
+#define RAW_LV_EDMAC_CHANNEL_ADDR 0xC0F26200
+#endif
+
+
+#ifdef CONFIG_RAW_LIVEVIEW
+// volatile because this points at some OS managed MMIO
+static volatile struct edmac_mmio *raw_lv_edmac = (struct edmac_mmio *)RAW_LV_EDMAC_CHANNEL_ADDR;
 #endif
 
 #endif  /* no CONFIG_EDMAC_RAW_SLURP */
@@ -226,14 +176,16 @@ static int (*dual_iso_get_dr_improvement)() = MODULE_FUNCTION(dual_iso_get_dr_im
  */
 
 #ifdef CONFIG_DIGIC_V
-#define RAW_TYPE_REGISTER 0xC0F37014
-#define PREFERRED_RAW_TYPE 0x10         /* CCD; also valid for DIGIC 6 */
-#else
-#define RAW_TYPE_REGISTER 0xC0F08114    /* PACK32_ISEL */
-#define PREFERRED_RAW_TYPE 0x5          /* DIGIC 4: CCD */
+    #define RAW_TYPE_REGISTER 0xC0F37014
+    #define PREFERRED_RAW_TYPE 0x10         /* CCD; also valid for DIGIC 6 */
+#elif defined(CONFIG_DIGIC_IV)
+    #define RAW_TYPE_REGISTER 0xC0F08114    /* PACK32_ISEL */
+    #define PREFERRED_RAW_TYPE 0x5          /* DIGIC 4: CCD */
 #endif
 
-#define SHAD_GAIN_REGISTER 0xC0F08030
+#if defined(CONFIG_DIGIC_IV) || defined(CONFIG_DIGIC_V)
+    #define SHAD_GAIN_REGISTER 0xC0F08030
+#endif
 
 
 #ifdef CONFIG_EDMAC_RAW_SLURP
@@ -729,7 +681,7 @@ static int raw_lv_buffer_size = 0;
 static void* raw_get_default_lv_buffer()
 {
 #if !defined(CONFIG_EDMAC_RAW_SLURP)
-    return CACHEABLE(shamem_read(RAW_LV_EDMAC));
+    return CACHEABLE(shamem_read((uint32_t)&(raw_lv_edmac->ram_addr)));
 #else
     return CACHEABLE(raw_lv_buffer);
 #endif
@@ -749,7 +701,7 @@ static int raw_lv_get_resolution(int* width, int* height)
   #ifdef CONFIG_DIGIC_V
     uint32_t top_left  = shamem_read(0xC0F06800);
     uint32_t bot_right = shamem_read(0xC0F06804);
-  #else
+  #elif defined(CONFIG_DIGIC_IV)
     uint32_t top_left  = shamem_read(0xC0F06084);
     uint32_t bot_right = shamem_read(0xC0F06088);
   #endif
@@ -762,7 +714,7 @@ static int raw_lv_get_resolution(int* width, int* height)
     const int column_factor = 1;
   #elif defined(CONFIG_DIGIC_V) /* checked 6D, 650D, 700D, M, 100D */
     const int column_factor = 4;
-  #else /* most DIGIC 4; checked 60D, 600D, 550D, 5D2, 50D, 7D, 1100D, 1200D, 1300D */
+  #elif defined(CONFIG_DIGIC_IV) /* most DIGIC 4; checked 60D, 600D, 550D, 5D2, 50D, 7D, 1100D, 1200D, 1300D */
     const int column_factor = 2;
   #endif
 
@@ -799,8 +751,8 @@ static int raw_lv_get_resolution(int* width, int* height)
 
 #else // ~CONFIG_EDMAC_RAW_SLURP
     /* autodetect raw size from EDMAC */
-    uint32_t lv_raw_height = shamem_read(RAW_LV_EDMAC+4);
-    uint32_t lv_raw_size = shamem_read(RAW_LV_EDMAC+8);
+    uint32_t lv_raw_height = shamem_read((uint32_t)&(raw_lv_edmac->yn_xn)); // yn_xn??  For height??
+    uint32_t lv_raw_size = shamem_read((uint32_t)&(raw_lv_edmac->yb_xb));
     if (!lv_raw_size) return 0;
 
     int pitch = lv_raw_size & 0xFFFF;
@@ -1339,7 +1291,12 @@ int raw_update_params_work()
          * Canon's guess may be up to 0.38 EV below the true value - or maybe more?
          * http://www.magiclantern.fm/forum/index.php?topic=20579.msg190437#msg190437
          */
+        #if defined(CONFIG_DIGIC_45)
         int canon_white = shamem_read(0xC0F12054) >> 16;
+        #elif defined(CONFIG_DIGIC_678X)
+        // at least on 200D, this is no longer at shamem + 12054
+        int canon_white = 12000; // it's used for initial estimate only
+        #endif
         raw_info.white_level = autodetect_white_level(canon_white);
         raw_info.dynamic_range = compute_dynamic_range(black_mean, black_stdev_x100, raw_info.white_level);
         printf("White level: %d -> %d\n", canon_white, raw_info.white_level);
@@ -2057,7 +2014,7 @@ void FAST raw_lv_redirect_edmac(void* ptr)
     #ifdef CONFIG_EDMAC_RAW_SLURP
     redirected_raw_buffer = (void*) CACHEABLE(ptr);
     #else
-    MEM(RAW_LV_EDMAC) = (intptr_t) CACHEABLE(ptr);
+    raw_lv_edmac->ram_addr = (uint32_t)CACHEABLE(ptr);
     #endif
 }
 
@@ -2110,7 +2067,7 @@ int _raw_lv_get_iso_post_gain()
     return 1;
 }
 
-#endif
+#endif // CONFIG_EDMAC_RAW_SLURP
 
 int raw_lv_settings_still_valid()
 {
@@ -2121,7 +2078,7 @@ int raw_lv_settings_still_valid()
     if (w != raw_info.width || h != raw_info.height) return 0;
     return 1;
 }
-#endif
+#endif // CONFIG_RAW_LIVEVIEW
 
 /* For accessing the pixels in a struct raw_pixblock, faster than via raw_get_pixel */
 /* todo: move in raw.h? */
@@ -2497,6 +2454,9 @@ void raw_lv_update()
         if (lv && lv_dispsize > 1 && DISPLAY_IS_ON)
         {
             /* todo: enqueue it in a vsync hook? */
+            #if defined(CONFIG_DIGIC_678X)
+                #error "Need to find equiv for 0xc0f08114"
+            #endif
             EngDrvOutLV(0xc0f08114, 0);
         }
         #endif
@@ -2538,7 +2498,12 @@ void raw_lv_request_bpp(int bpp)
     take_semaphore(raw_sem, 0);
 
     /* raw bit depth setup is done from PACK32_MODE register (mask 0x131) */
-    const uint32_t PACK32_MODE = 0xC0F08094;
+    #if defined(CONFIG_DIGIC_45)
+        const uint32_t PACK32_MODE = 0xC0F08094;
+    #elif defined(CONFIG_200D)
+        const uint32_t PACK32_MODE = 0xd0008094; // plausible from rom, e.g. e0159eee on 200d 1.0.1,
+                                                 // compare 5d3 1.2.3 ff57c7c8
+    #endif
     enum {
         MODE_16BIT = 0x130,
         MODE_14BIT = 0x030,
@@ -2594,7 +2559,7 @@ void raw_lv_request_digital_gain(int gain)
     give_semaphore(raw_sem);
 }
 
-#endif
+#endif // CONFIG_RAW_LIVEVIEW
 
 /* may not be correct on 4:3 screens */
 /* ratios are optional - if zero, they are taken from raw_capture_info */
