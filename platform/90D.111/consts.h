@@ -4,20 +4,20 @@
 
 
 // early boot mem stuff
-#define BR_DCACHE_CLN_1   0xe0040068  // first call to dcache_clean, before cstart  MFD: LOOKS SAME
-#define BR_ICACHE_INV_1   0xe0040072  // first call to icache_invalidate, before cstart MFD: LOOKS SAME
-#define BR_DCACHE_CLN_2   0xe00400a0  // second call to dcache_clean, before cstart MFD: LOOKS SAME
-#define BR_ICACHE_INV_2   0xe00400aa  // second call to icache_invalidate, before cstart MFD: LOOKS SAME
+#define BR_DCACHE_CLN_1   0xe0040068  // first call to dcache_clean, before cstart
+#define BR_ICACHE_INV_1   0xe0040072  // first call to icache_invalidate, before cstart
+#define BR_DCACHE_CLN_2   0xe00400a0  // second call to dcache_clean, before cstart
+#define BR_ICACHE_INV_2   0xe00400aa  // second call to icache_invalidate, before cstart
 #define BR_BR_CSTART      0xe00400c0  // D78 cams have an indirect branch to cstart,
                                       // the first of which is absolute; overwrite it
-#define BR_CPU_STUFF      0xe004012a  // A short function that inits some CPU related globals MFD: LOOKS SAME
-#define BR_BZERO32        0xe0040152  // called from cstart  MFD: LOOKS SAME
-#define BR_CREATE_ITASK   0xe00401b4  // called from cstart MFD: LOOKS SAME
+#define BR_CPU_STUFF      0xe004012a  // A short function that inits some CPU related globals
+#define BR_BZERO32        0xe0040152  // called from cstart
+#define BR_CREATE_ITASK   0xe00401b4  // called from cstart
 
-#define PTR_USER_MEM_SIZE           0xe00401d8   /* easier to patch the size; start address is computed MFD: LOOKS SAME */ 
-#define PTR_SYS_OFFSET              0xe00401d0   // offset from DryOS base to sys_mem start MFD: LOOKS SAME
-#define PTR_SYS_OBJS_OFFSET         0xe00401dc   // offset from DryOS base to sys_obj start MFD: LOOKS SAME
-#define PTR_DRYOS_BASE              0xe00401bc  //MFD: LOOKS SAME
+#define PTR_USER_MEM_SIZE           0xe00401d8   /* easier to patch the size; start address is computed */
+#define PTR_SYS_OFFSET              0xe00401d0   // offset from DryOS base to sys_mem start
+#define PTR_SYS_OBJS_OFFSET         0xe00401dc   // offset from DryOS base to sys_obj start
+#define PTR_DRYOS_BASE              0xe00401bc
 
 #define ML_MAX_USER_MEM_STOLEN 0x44000 // True max differs per cam, 0x40000 has been tested on
                                        // the widest range of D678 cams with no observed problems,
@@ -46,7 +46,6 @@ DryOS base    user_start                       sys_objs_start    sys_start
                    <-------  user_mem_size ------->                 <---- sys_len ------->
     ---------------- sys_objs_offset ------------->
     ---------------- sys_mem_offset ------------------------------>
-
 After patching, user mem reduced and sys mem moved up
 DryOS base    user_start                                 sys_objs_start    sys_start
     |-------------|-------------------|<-- ml_reserved_mem -->|---------------|--------------------->
@@ -141,7 +140,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define INFO_BTN_NAME "INFO"
 #define Q_BTN_NAME "Q/SET"
 // Disabled to to "../../src/menuindex.c:128:6: error: #error Please remove unused definition of ARROW_MODE_TOGGLE_KEY."
-//#define ARROW_MODE_TOGGLE_KEY "FUNC"
+// #define ARROW_MODE_TOGGLE_KEY "FUNC"
 
 // "SDPowerOn" / "SDPowerOff", passed to DryosDebugMsg in a function
 // that changes states for several devices (presumably not all LEDs?).
