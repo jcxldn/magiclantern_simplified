@@ -38,7 +38,7 @@ THUMB_FN(0xe05cbf54,  icache_invalidate)  /* JC unsure, matches to a func | loop
 
 /** Tasks **/
 THUMB_FN(0xe064270a,  task_create) /* used to start TaskMain, GuiMainTask etc */
-//THUMB_FN(0xdf008f0b,  task_create_ex) /* as task_create, but allows selecting CPU for task*/
+THUMB_FN(0xe0642922,  task_create_ex) /* as task_create, but allows selecting CPU for task*/
 THUMB_FN(0xe05bc4f2,  msleep) /* JC unsure - matches to a func | argument is always multiple of 10  MFD: UPDATED WITH POSSIBLE ENTRY */
 DATA_PTR(0x1028,  current_task)   /* JC: untouched | from task_create; pointer to the current task structure   MFD: possibly same */
 DATA_PTR(0x1010,  current_interrupt)  /* JC: untouched | from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
@@ -61,8 +61,8 @@ THUMB_FN(0xe05bcce2,  GetMemoryInformation) // JC: Updated
 THUMB_FN(0xe05bccb6,  GetSizeOfMaxRegion) //JC: Updated
 THUMB_FN(0xe05bc8fc, _alloc_dma_memory) //JC: Updated
 THUMB_FN(0xe05bc902, _free_dma_memory) //JC: Updated
-#THUMB_FN(0xe05fa154,  malloc) // JC: complibMemAlloc, not sure where real one is
-#THUMB_FN(0xe05fa1ea,  free) // JC: compilbMemFree, not sure where real one is
+#THUMB_FN(0xe05bcd64,  malloc) /* int ** malloc(int **loc?,int size) */
+#THUMB_FN(0xe05bceee,  free) /* void free(int block?,uint ptr?) */
 
 /** Debug messages **/
 THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* (Updated for 90D) lots of debug messages; format string is third argument */
