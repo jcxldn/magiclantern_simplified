@@ -309,8 +309,7 @@ DATA_PTR( 0x235b2bc,  _rgb_vram_info) // JC: looks corr, Used in many places, wr
 NSTUB(0x0,  LCD_Palette) // Not required / changed in D8
  // FIXME - presumably we should stop using this stub in source?
 
-DATA_PTR( 0x234d6b8,  task_dispatch_hook) // JC: incorr? | find usage in 200D, trace up call hierarchy to task_create,
-  // trace back down same hierarchy in 850D
+DATA_PTR(0x4144,  task_dispatch_hook) // JC: Same as 850D
 THUMB_FN(0xe05bda80, _prop_request_change)  //JC: ?? | MFD: REPLACED WITH POSSIBLE Entry
 THUMB_FN(0xe05cc7de,  dm_set_store_level) // JC: ?? | called by "dmstore"
   // Called in init_task(), shortly before ICU Firmware version string
