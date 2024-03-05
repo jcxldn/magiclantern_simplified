@@ -2,6 +2,9 @@
  *  90D 1.1.1 consts
  */
 
+// Used as reference: names_are_hard' comments for Makers_Fun_Duck
+// https://discord.com/channels/671072748985909258/925479711398850570/982854682009550918
+
 
 // early boot mem stuff
 #define BR_DCACHE_CLN_1   0xe0040068  // first call to dcache_clean, before cstart
@@ -60,8 +63,8 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 
 #define HALFSHUTTER_PRESSED 0 // doesn't seem similar to 200D.  Perhaps gone, like R?
 
-#define DRYOS_ASSERT_HANDLER 0x4000 // Used early in a function I've named debug_assert
-#define CURRENT_GUI_MODE (*(int*)0x83a0) // see SetGUIRequestMode, 0x65c8 + 0x5c on 200D
+#define DRYOS_ASSERT_HANDLER 0x234d564   // Used early in a function I've named debug_assert
+#define CURRENT_GUI_MODE (*(int*)0x23518d8) // see SetGUIRequestMode, 0x65c8 + 0x5c on 200D
 
 #define GUIMODE_PLAY 8194
 #define GUIMODE_MENU 8195
@@ -88,9 +91,10 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 
 // could be either of these two, maybe even both?  Wants testing on real cam
 //#define DISPLAY_SENSOR_POWERED (*(int *))(0xb074) // SJE unsure.  Function has changed a lot
-#define DISPLAY_SENSOR_POWERED (*(int *))(0x5b950) // "lcd_disp_pwr_on" 
+//#define DISPLAY_SENSOR_POWERED (*(int *))(0x5b950) // "lcd_disp_pwr_on"
+#define DISPLAY_SENSOR_POWERED (*(int *))(0x76288) // "lcd_disp_pwr_on"
 
-#define DISPLAY_IS_ON (*(int *)0xb0dc) // "DispOperator_PropertyMasterSetDisplayTurnOffOn"
+#define DISPLAY_IS_ON (*(int *)0x2354a6c)          // "DispOperator_PropertyMasterSetDisplayTurnOffOn"
 
 // via malloc_info() "Malloc Information".  This uses two structs, 
 // the call inside the main if block initialises the larger one,
@@ -98,10 +102,11 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 //
 // It's initialised from MALLOC_STRUCT, you want to use the offsets from that.
 // The larger struct has printfs that let you assign names.
-#define MALLOC_STRUCT 0x2d3f8
+#define MALLOC_STRUCT 0x43044
 #define MALLOC_FREE_MEMORY (MEM(MALLOC_STRUCT + 8) - MEM(MALLOC_STRUCT + 0x1C)) // "Total Size" - "Allocated Size"
 
-#define GMT_FUNCTABLE 0xe09981d4
+
+#define GMT_FUNCTABLE 0xe0999590 // JC: unsure
 #define GMT_NFUNCS 0x7
 
 // Find a function that manually initialises some large struct, then calls
@@ -111,7 +116,12 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 // The second param to register_func_wrapper() is function pointer.
 // Many of these set lvae_struct fields, related to the name.
 // In Ghidra, it helps a lot if you define a struct of the full size, even if it's empty!
-#define LVAE_STRUCT 0x4fa6c
+
+// This is the 90d struct base but I haven't checked the related CONTROL_BV fields, etc.
+// These may have altered.
+#define LVAE_STRUCT 0x6a228
+
+
 #define CONTROL_BV      (*(uint16_t*)(LVAE_STRUCT+0x28)) // via "lvae_setcontrolbv"
 #define CONTROL_BV_TV   (*(uint16_t*)(LVAE_STRUCT+0x3e)) // via "lvae_setcontrolaeparam"
 #define CONTROL_BV_AV   (*(uint16_t*)(LVAE_STRUCT+0x40)) // via "lvae_setcontrolaeparam"
@@ -127,7 +137,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 // SJE ">> FstpasDesign" gets you a function using that string near the top,
 // earlier there are calls, one of these returns the struct address.
 // The 2nd one for me, but check with how DryosDebugMsg() calls use the value later on.
-#define LVAE_ISO_STRUCT 0x749e8
+#define LVAE_ISO_STRUCT 0x8ef10 // JC: likely fine
 #define LVAE_ISO_MIN    (*(uint8_t* )LVAE_ISO_STRUCT + 0x0E ) // via string: ISOMin:%d
 
 //Replaced by CONFIG_NO_BFNT in internals.h
@@ -172,9 +182,10 @@ extern int winsys_bmp_dirty_bit_neg;
 #define WINSYS_BMP_DIRTY_BIT_NEG MEM(&winsys_bmp_dirty_bit_neg) // faked via function_overrides.c
 #define FOCUS_CONFIRMATION (*(int*)0x4444) // wrong, focusinfo looks really different 50D -> 200D
 
-#define DISP_VRAM_STRUCT_PTR ((unsigned int *)(*(int *)0xaff0)) // used many DISP related places, "CurrentImgAddr : %#08x"
-                                                                // is a good string as this gets us the pointers to current buffers.
-                                                                // param1 is DisplayOut (HDMI, EVF, LCD?)
+// JC: updated
+#define DISP_VRAM_STRUCT_PTR ((unsigned int *)(*(int *)0x2354988)) // used many DISP related places, "CurrentImgAddr : %#08x"
+                                                                    // is a good string as this gets us the pointers to current buffers.
+                                                                    // param1 is DisplayOut (HDMI, EVF, LCD?)
 // SJE FIXME probably the constant 0xa8 should be dependent on what display is in use.
 // Choices are 0xa0, a8 or b0.  a8 tested to work for LCD
 #define YUV422_LV_BUFFER_DISPLAY_ADDR (*(DISP_VRAM_STRUCT_PTR + (0xa8 / 4)))
