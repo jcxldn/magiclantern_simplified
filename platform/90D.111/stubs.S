@@ -251,7 +251,7 @@ THUMB_FN(0x0,  fsuDecodePartitionTable)
   // Seems to always be "idle" task.
   // (we don't use this, but instead calculate it during early init,
   //  to save backporting this stub for all older cams)
-NSTUB( 0x234d67c,  task_max) // JC: untouched, incorrect
+NSTUB( 0x234d67c,  task_max) // JC: untouched, likely a struct. seems correct though
 NSTUB(0x0235b190,  gui_task_list) // JC: untouched, incorrect | Strings have changed or been removed compared to earlier cams.  //MDF: REPLACED WITH POSSIBLE ENTRY
    // Found via checking all call sites of CreateRecursiveLock()
    // and comparing with 200d until similar code found.
