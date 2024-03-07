@@ -29,49 +29,49 @@
 
 /** Startup **/
 NSTUB(ROMBASEADDR, firmware_entry)
-THUMB_FN(0xe0040104,  cstart) /* JC updated (-e4 from 850D) | calls bzero32 and create_init_task(..., init_task, ...) */
+THUMB_FN(0xe0040104,  cstart) /* calls bzero32 and create_init_task(..., init_task, ...) (-e4 from 850D) */
 THUMB_FN(0xe05cd274,  bzero32)/* zeros out a data structure */
-THUMB_FN(0xe0363018,  create_init_task)   /* JC unsure, matches to a func | low-level DryOS initialization MFD:UPDATED WITH NEW VALUE*/
-THUMB_FN(0xe0040236,  init_task)  /* (Updated for 90D): USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc*/
-THUMB_FN(0xe05cbe80,  dcache_clean) /* JC updated (+e4 from 850D)| loop with MCR p15 c7,c10,1; DSB */
-THUMB_FN(0xe05cbf54,  icache_invalidate)  /* JC unsure, matches to a func | loop with MCR p15 c7,c5,1; c7,c1,6; c7,c1,0; ISB   MFD:UPDATED WITH NEW VALUE*/
+THUMB_FN(0xe0363018,  create_init_task)   /*  low-level DryOS initialization */
+THUMB_FN(0xe0040236,  init_task)  /* USER_MEM size checking, dmSetup, termDriverInit, stdlibSetup etc */
+THUMB_FN(0xe05cbe80,  dcache_clean) /* loop with MCR p15 c7,c10,1; DSB  (+e4 from 850D) */
+THUMB_FN(0xe05cbf54,  icache_invalidate)  /* loop with MCR p15 c7,c5,1; c7,c1,6; c7,c1,0; ISB */
 
 /** Tasks **/
 THUMB_FN(0xe064270a,  task_create) /* used to start TaskMain, GuiMainTask etc */
-THUMB_FN(0xe0642922,  task_create_ex) /* as task_create, but allows selecting CPU for task*/
-THUMB_FN(0xe05bc4f2,  msleep) /* JC unsure - matches to a func | argument is always multiple of 10  MFD: UPDATED WITH POSSIBLE ENTRY */
+THUMB_FN(0xe0642922,  task_create_ex) /* as task_create, but allows selecting CPU for task */
+THUMB_FN(0xe05bc4f2,  msleep) /* argument is always multiple of 10 */
 DATA_PTR(0x1028,  current_task)   /* JC: untouched | from task_create; pointer to the current task structure   MFD: possibly same */
 DATA_PTR(0x1010,  current_interrupt)  /* JC: untouched | from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
 
 /** Dumper **/
-THUMB_FN(0xe0222804,  dump_file)  /* (Updated for 90D): tries to save a file to either "A:/%s" or "B:/%s"; calls FIO_RemoveFile/CreateFile/WriteFile/CloseFile/Flush MFD: UPDATED WITH NEW VALUE**/
+THUMB_FN(0xe0222804,  dump_file)  /* tries to save a file to either "A:/%s" or "B:/%s"; calls FIO_RemoveFile/CreateFile/WriteFile/CloseFile/Flush */
 
 /** Memory info **/
-THUMB_FN(0xe018c13c,  malloc_info)/* (Updated for 90D): Malloc Information */
-THUMB_FN(0xe018c1d4,  sysmem_info)/* (Updated for 90D): System Memory Information */
-THUMB_FN(0xe017f194,  memmap_info)/* (Updated for 90D): Exception vector, DRYOS system memory etc */
-THUMB_FN(0xe011bbb0,  smemShowFix)/* (Updated for 90D): Common Lower, Common Upper etc */
+THUMB_FN(0xe018c13c,  malloc_info) /* Malloc Information */
+THUMB_FN(0xe018c1d4,  sysmem_info) /* System Memory Information */
+THUMB_FN(0xe017f194,  memmap_info) /* Exception vector, DRYOS system memory etc */
+THUMB_FN(0xe011bbb0,  smemShowFix) /* Common Lower, Common Upper etc */
 
 /** Everything after this until noted otherwise is at offset +0xE4 compared to 850D. **/
 
 /** Memory allocation **/
-THUMB_FN(0xe05bce58, _AllocateMemory) //JC: Updated
-THUMB_FN(0xe05bd010, _FreeMemory) // JC: Updated
-THUMB_FN(0xe05bcce2,  GetMemoryInformation) // JC: Updated
-THUMB_FN(0xe05bccb6,  GetSizeOfMaxRegion) //JC: Updated
-THUMB_FN(0xe05bc8fc, _alloc_dma_memory) //JC: Updated
-THUMB_FN(0xe05bc902, _free_dma_memory) //JC: Updated
+THUMB_FN(0xe05bce58, _AllocateMemory)
+THUMB_FN(0xe05bd010, _FreeMemory)
+THUMB_FN(0xe05bcce2,  GetMemoryInformation)
+THUMB_FN(0xe05bccb6,  GetSizeOfMaxRegion)
+THUMB_FN(0xe05bc8fc, _alloc_dma_memory)
+THUMB_FN(0xe05bc902, _free_dma_memory)
 #THUMB_FN(0xe05bcd64,  malloc) /* int ** malloc(int **loc?,int size) */
 #THUMB_FN(0xe05bceee,  free) /* void free(int block?,uint ptr?) */
 
 /** Debug messages **/
-THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* (Updated for 90D) lots of debug messages; format string is third argument */
+THUMB_FN(0xe05cc4c8,  DryosDebugMsg)  /* lots of debug messages; format string is third argument */
 
 /** DMA **/
 THUMB_FN(0xe05f7486,  dma_memcpy)
 
 /** Eventprocs (call by name) **/
-THUMB_FN(0xe05b2ff2,  call)   /* JC unsure, seems correct? | many functions called by name (lv_start, lv_stop etc) */
+THUMB_FN(0xe05b2ff2,  call)   /* many functions called by name (lv_start, lv_stop etc) */
 
 /** File I/O **/
 THUMB_FN(0xe05aec38, _FIO_OpenFile)
@@ -81,12 +81,12 @@ THUMB_FN(0xe05af274, _FIO_WriteFile)
 THUMB_FN(0xe05af1b6,  FIO_SeekSkipFile)
 THUMB_FN(0xe05af490,  FIO_CloseFile)
 THUMB_FN(0xe05b0516, _FIO_CreateDirectory)
-//THUMB_FN(0xE04BD061,  FIO_FindFirst) // TBD
-THUMB_FN(0xe05b0970, _FIO_FindFirstEx) // "FirstEnt", is it _FIO_FindFirst instead?
-THUMB_FN(0xe05b0a6c,  FIO_FindNextEx) // "FindNext", is it _FIO_FindNext instead?
+//THUMB_FN(0xE04BD061,  FIO_FindFirst) // JC: to find
+THUMB_FN(0xe05b0970, _FIO_FindFirstEx) // "FirstEnt"
+THUMB_FN(0xe05b0a6c,  FIO_FindNextEx) // "NextEnt"
 
-THUMB_FN(0xe05b0b2e,  FIO_FindClose) // "CloseEnt", not sure
-THUMB_FN(0xe05af62a, _FIO_GetFileSize64) // "AcqSize", not sure
+THUMB_FN(0xe05b0b2e,  FIO_FindClose) // "CloseEnt"
+THUMB_FN(0xe05af62a, _FIO_GetFileSize64) // "AcqSize"
 
 THUMB_FN(0xe05af02a, _FIO_RemoveFile)
 THUMB_FN(0xe05b008e, _FIO_RenameFile)
@@ -98,7 +98,7 @@ THUMB_FN(0xe05b0666,  FIO_RemDir)
 THUMB_FN(0xe05b0282,  FIO_Divide)
 THUMB_FN(0xe05b019a,  FIO_Concat)
 THUMB_FN(0xe05aff94,  FIO_ChopT)
-THUMB_FN(0xe05afeb6,  FIO_ChopH)
+THUMB_FN(0xe05afea6,  FIO_ChopH)
 THUMB_FN(0xe05afd14,  FIO_ChgCreateTime)
 THUMB_FN(0xe05afc52,  FIO_FreeEntCnt)
 THUMB_FN(0xe05afa40,  FIO_SetFTime)
@@ -117,21 +117,21 @@ THUMB_FN(0xe05b0930, FIO_DelayRemove) // Prints and then calls FIO_DelayFlush
 
 /** GUI **/
 //THUMB_FN(0xe05cc2c4,  GUI_Control) // JC: unsure | Looks missing on 850D, possibly same as R 
-THUMB_FN(0xe059383a,  SetGUIRequestMode) // JC: +0xBC | Code is quite different from earlier cams, not a big switch?
+THUMB_FN(0xe059383a,  SetGUIRequestMode) // +0xBC from 850D | Code is quite different from earlier cams, not a big switch?
  // Possibly weird decomp?  Param is the same though, maybe it still works
-THUMB_FN(0xe057c68c,  gui_init_end) // JC: matched to EndGuiInit | DNE on R, but does on 850D
-THUMB_FN(0xe020b240,  gui_main_task)//JC: matched to GUI.c | MFD: UPDATED WITH POSSIBLE ENTRY
-THUMB_FN(0xe020b376,  gui_enqueue_message) // "warning! QueueLength=%d" MFD: UPDATED WITH POSSIBLE ENTRY LOW CONFIDENCE
+THUMB_FN(0xe057c68c,  gui_init_end) // "EndGuiInit" | DNE on R, but does on 850D
+THUMB_FN(0xe020b240,  gui_main_task) // "GUI.c"
+THUMB_FN(0xe020b376,  gui_enqueue_message) // "warning! QueueLength=%d"
 
 /** GUI timers **/
 THUMB_FN(0xe05a92ce,  CancelTimer) //JC: unsure, is a loop | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
-THUMB_FN(0xe030a2fe,  SetHPTimerAfterNow) // JC: "HPTimer.c" | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
-THUMB_FN(0xe030a36e,  SetHPTimerNextTick) // JC: "HPTimer.c" same "worker" function as SetHPTimerAfterNow  MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT 
-THUMB_FN(0xe05a92fc,  SetTimerAfter) // JC: "Timer1m.c" | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
-THUMB_FN(0xe06c278a,  CancelDateTimer)//JC: Updated for 90D | MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
+THUMB_FN(0xe030a2fe,  SetHPTimerAfterNow) // "HPTimer.c"
+THUMB_FN(0xe030a36e,  SetHPTimerNextTick) // "HPTimer.c" same "worker" function as SetHPTimerAfterNow 
+THUMB_FN(0xe05a92fc,  SetTimerAfter) // "Timer1m.c"
+THUMB_FN(0xe06c278a,  CancelDateTimer)
 
 /** Interrupts **/
-// JC: unsure
+// JC: unsure where to look for all.
 //DATA_PTR(0x4030,  pre_isr_hook)
 //DATA_PTR(0x4034,  post_isr_hook)
 //DATA_PTR(   0x6CC10,  isr_table_handler)
@@ -139,12 +139,13 @@ THUMB_FN(0xe06c278a,  CancelDateTimer)//JC: Updated for 90D | MFD: UPDATED WITH 
 THUMB_FN(0xe01ab1dc,  cli_spin_lock)  /* used in AllocateMemory/FreeMemory and others */  //MFD: UPDATED WITH POSSIBLE ENTRY CODE IS A LITTLE DIFFERENT
 
 /** MPU communication **/
+// JC: prob worth someone else validating these.
 THUMB_FN(0xe008ba68,  mpu_send) // "InterCom::Siodriver.c"
 THUMB_FN(0xe0641f30,  mpu_recv) // JC: +0xE4 from 850D, still unsure though | "ReceiveCBR : Unknown Command" //MFD: ReceiveCBR : Unknown Command IS THERE, HOWEVER THE CODE IS QUITE DIFFERENT
-DATA_PTR(0x02354930,  mpu_recv_cbr) // JC: unchanged | search for Direct Refs to mpu_recv address, function pointer should be found, //MFD: UPDATED WITH POSSIBLE value
+DATA_PTR(0xe0641fe4,  mpu_recv_cbr) // JC: unsure | search for Direct Refs to mpu_recv address, function pointer should be found, //MFD: UPDATED WITH POSSIBLE value
 // find the function that uses it, which stores it; address where stored is mpu_recv_cbr
-DATA_PTR(   0x76160,  mpu_send_ring_buffer)  // JC: unchanged | ring buffer used in mpu_send //MFD: UPDATED WITH POSSIBLE value
-DATA_PTR( 0x2354924,  mpu_send_ring_buffer_tail) // JC: updated | ring buffer index incremented in mpu_send
+DATA_PTR(   0x76228,  mpu_send_ring_buffer)  // ring buffer used in mpu_send
+DATA_PTR( 0x2354924,  mpu_send_ring_buffer_tail) // ring buffer index incremented in mpu_send
 DATA_PTR(   0x76020,  mpu_recv_ring_buffer)  // JC: unchanged | ring buffer used in SIO3_ISR, subroutine that processes two chars at a time //MFD: UPDATED WITH POSSIBLE
 DATA_PTR( 0x235493c,  mpu_recv_ring_buffer_tail) // JC: unchanged | ring buffer index incremented in the above subroutine
 
@@ -157,22 +158,24 @@ THUMB_FN(0xe0069bf8,  vsnprintf)  /* called near dmstart; references "01234567",
 THUMB_FN(0xe03dcc78,  debug_assert) // DRYOS_ASSERT_HANDLER related MFD: updated with possible entry
 
 // SJE trying to get a substitute vsync callback working for screen refresh
+// JC: untouched
 //DATA_PTR(0xfd78,  winsys_sem_count)
 //DATA_PTR(0xfec8,  bmp_vsync_cbr)
 //THUMB_FN(0xe049e96c,  BmpVsyncCallBack)
 
 // UNSURE or untested
-THUMB_FN(0xe00b0822,  get_task_by_id) // JC: unsure | called indirectly by task_create and functions using string "TASK Name" //MFD: updated with possible entry
-THUMB_FN(0xe0397950, _get_task_info_by_id) //JC: matches to a function | MFD: updated with possible entry
-NSTUB(0x0234e5c4,  dm_names) // JC: seems correct?? | in DebugMsg, before the 1st loop target //MFD: updated with possible entry
-NSTUB(   0x0235e09c,  sd_device) // JC: unsure in sdReadBlk, probably 0xe02b6fa2.  Lots of refs //MFD: updated with possible entry
+//THUMB_FN(0xe00b0822,  get_task_by_id) // JC: unsure | called indirectly by task_create and functions using string "TASK Name" //MFD: updated with possible entry
+THUMB_FN(0xe0397950, _get_task_info_by_id) // JC: incorrect 
+NSTUB(0x0234e5c4,  dm_names) // JC: seems correct? | in DebugMsg, before the 1st loop target //MFD: updated with possible entry
+NSTUB(   0x0235e09c,  sd_device) // JC: unsure | in sdReadBlk, probably 0xe02b6fa2.  Lots of refs //MFD: updated with possible entry
   // to 0x1fd7c, some to 0x1fd80
 
 NSTUB(0x234e8ec,  gui_main_struct) // See function using "Queue Clear event" string, e020bae8
    // There's a base of struct, and some refs to fields via offsets.
    // Find the right one.
-//THUMB_FN(0xe00c54ab,  GUI_ChangeMode) // JC: unsure | "GUI_ChangeMode:%d" string
-THUMB_FN(0xe05920f2,  DispSensorStart) // 0x86f4 looks to be a bool for whether Sensor is started  //MFD: REPLACED WITH POSSIBLE Entry
+//THUMB_FN(0xe00c54ab,  GUI_ChangeMode) // JC: incorrect | "GUI_ChangeMode:%d" string
+THUMB_FN(0xe05920d4,  DispSensorStart) // "guiDispSensorStart" | 0x86f4 looks to be a bool for whether Sensor is started
+//THUMB_FN(0xe05920f2, DispSensorStop) JC: found this
 THUMB_FN(0xe05bb824,  DeleteMemorySuite)
 THUMB_FN(0xe05bbab0,  CreateMemorySuite)
 THUMB_FN(0xe05bb0f6,  CreateMemoryChunk) // JC: (+0xE4 from 850D) | called from CreateMemorySuite
@@ -201,19 +204,19 @@ THUMB_FN(0xe05bb658,  GetFirstChunkFromSuite)
 THUMB_FN(0xe05bbe78,  GetNextMemoryChunk)
 THUMB_FN(0xe05bb41a,  GetMemoryAddressOfMemoryChunk)
 THUMB_FN(0xe0765454,  AllocateMemoryResource) // JC: unsure, refs "RscWrap.c"
-THUMB_FN(0xe0765482,  AllocateContinuousMemoryResource) // same ref as above
-THUMB_FN(0xe07654b0,  FreeMemoryResource) // same ref as above
+THUMB_FN(0xe0765482,  AllocateContinuousMemoryResource) // JC: same ref as above
+THUMB_FN(0xe07654b0,  FreeMemoryResource) // JC: same ref as above
 THUMB_FN(0xe05b2d08,  msg_queue_receive) // "SystemIF::KerQueue.c" useful for finding some of these msg_ functions
 
 
-THUMB_FN(0xe05b2e66,  msg_queue_post) // used in gui_enqueue_message  MFD: REPLACED WITH POSSIBLE Entry
+THUMB_FN(0xe05b2e66,  msg_queue_post) // used in gui_enqueue_message
 THUMB_FN(0xe05b2e9c,  msg_queue_count) // Fairly hard to find.  Often used near DispLockStop, which is easy to find
    // and not used often.
 THUMB_FN(0xe05b2c44,  msg_queue_create) // CreateMessageQueue - In 50D, msg_queue_create calls 0xff866424,
-// the equiv of which is 0xdf00b114 (and was easier to find) MDF: REPLACED WITH POSSIBLE ENTRY
+// the equiv of which is 0xdf00b114 (and was easier to find)
 THUMB_FN(0xe05bdf8c,  prop_deliver) // used near "UNKNOWN PROPERTY ID " in call to DryosDebugMsg
 THUMB_FN(0xe05bda96,  prop_register_slave)
-DATA_PTR(0xeb80,  LiveViewApp_dialog) // in StartLiveViewApp()
+DATA_PTR(0xeb80,  LiveViewApp_dialog) // JC: unchanged | in StartLiveViewApp()
 THUMB_FN(0xe04518e8,  LiveViewApp_handler) // DebugMsg: "StartLiveViewApp(%#x)", address passed to CreateDialogBox
 THUMB_FN(0xe07a3cea,  LiveViewShutterApp_handler) // DebugMsg: "StartLiveViewShutterApp", address passed to CreateDialogBox
 THUMB_FN(0xe032c6c0,  PlayMovieGuideApp_handler) // "PlayMovieGuide_Start"
@@ -222,7 +225,7 @@ THUMB_FN(0xe07053f0,  ShootOlcApp_handler) // near "StopShootOlcApp PopPalette(%
 THUMB_FN(0xe08dbc18,  GetCFnData) // "GetCFnData" Function sig is different but the body looks similar.  MFD: REPLACED WITH POSSIBLE Entry
   // Looks like the inner functions use registers the outer doesn't, which confuses Ghidra
   // re how many args outer takes.
-THUMB_FN(0xe08dcacc,  SetCFnData) // JC: "SetCFnMappingData" There are some "SetCFnData" related strings MFD: REPLACED WITH POSSIBLE Entry
+THUMB_FN(0xe08dcacc,  SetCFnData)
   // SJE size of struct has changed, don't know if this is relevant
 
 // Not required on 200D given usage by ML is always behind cam specific guards.
@@ -230,14 +233,17 @@ THUMB_FN(0xe08dcacc,  SetCFnData) // JC: "SetCFnMappingData" There are some "Set
  // whereas ML thinks it takes int.  Either this is wrong, or will
  // need wrapping to preserve the reg.
 
-THUMB_FN(0xe0757ed8, _malloc) // These two names are used in 50D and CONFIG_HELLO_WORLD won't build without them,  MDF: REPLACED WITH POSSIBLE ENTRY
-THUMB_FN(0xe0757f10, _free)  // however, the inital stubs for 200D call these simply malloc/free.  MDF: REPLACED WITH POSSIBLE ENTRY
-THUMB_FN(0xe054f5c6,  SRM_AllocateMemoryResourceFor1stJob) // JC: unsure for 90D | "hJobMemorySuite" strings, function a little earlier  //MFD: REPLACED WITH POSSIBLE Entry
-THUMB_FN(0xe05519ec,  SRM_FreeMemoryResourceFor1stJob) // JC: unsure for 90D | find refs to "pMessage", there are several similar looking functions using it,
+THUMB_FN(0xe0757ed8, _malloc) // These two names are used in 50D and CONFIG_HELLO_WORLD won't build without them,
+THUMB_FN(0xe0757f10, _free)  // however, the inital stubs for 200D call these simply malloc/free.
+
+// On 90D, SRM_*, "hJobMemorySuite" strings don't exist
+//THUMB_FN(0xe054f5c6,  SRM_AllocateMemoryResourceFor1stJob) // "hJobMemorySuite" strings, function a little earlier  //MFD: REPLACED WITH POSSIBLE Entry
+//THUMB_FN(0xe05519ec,  SRM_FreeMemoryResourceFor1stJob) // find refs to "pMessage", there are several similar looking functions using it,
    // this is my best guess - this one has pPriorMessage and sets offset 8
    // in the struct to 0, offset 0x10 to param1
 														 //  MDF: REPLACED WITH POSSIBLE ENTRY
-THUMB_FN(0xe05be040, _prop_cleanup) // JC: incorrect | "./Multicast/PropertyMgr.c" check funcs that ref this string
+
+THUMB_FN(0xe05be040, _prop_cleanup) // JC: incorrect, has two arguments. | "./Multicast/PropertyMgr.c" check funcs that ref this string
 THUMB_FN(0xe05cb688,  CreateRecursiveLock) // JC: incorrect, takes int arg. | via "KerRLock.c", CRL() calls a function that regs this string, not many do
 THUMB_FN(0xe05a955c, AcquireRecursiveLock) // JC: incorrect, two params.
 THUMB_FN(0xe05a9626,  ReleaseRecursiveLock) // JC: possibly correct, sig matches
@@ -261,35 +267,33 @@ THUMB_FN(0xe083c674, _LoadCalendarFromRTC)  //JC: untouched, incorrect | MDF: RE
  
 
 // These are required on Digic 678
-THUMB_FN(0xe02c08ec, RefreshVrmsSurface) // jc: corr | "Call RefreshVrmsSurface" / "XimrExe"
-DATA_PTR(   0x0235b308,  display_refresh_needed) // jc: corr | if 0, RefreshVrmsSurface() does nothing
+THUMB_FN(0xe02c08ec, RefreshVrmsSurface) // "Call RefreshVrmsSurface" / "XimrExe"
+DATA_PTR(   0x0235b308,  display_refresh_needed) // if 0, RefreshVrmsSurface() does nothing
 THUMB_FN(0xe0194248, XimrExe) // JC: maps to func | trigger Ximr unit to execute (HW compositor, partially understood)
-DATA_PTR(   0x0235b2f4,  winsys_sem) // JC: seems corr
+DATA_PTR(   0x0235b2f4,  winsys_sem)
 
 // These are not strictly required, although recent dev work has added dependencies;
 // these likely should be removed before a "real" release
-THUMB_FN(0xe000be02, uart_printf)  // JC: updated
-//#NSTUB(0xdf008c7c, uart_printf) // JC: cannot find. Thunked equivalent of the above.  Note, ARM, not Thumb.
+THUMB_FN(0xe000be02, uart_printf)
+//#NSTUB(0xdf008c7c, uart_printf) // JC: cannot find. | Thunked equivalent of the above.  Note, ARM, not Thumb.
    // Both seem to work the same.
-  
-// JC: untouched underneath
 
 // These are not required, but have been used for experiments, debugging, etc
-//THUMB_FN(0xe049f041, fill_rectangle_to_vram) // JC: incorr | "FillRectangleToVram ILLEGAL_PARAMETER"
+//THUMB_FN(0xe02bedb4, fill_rectangle_to_vram) // "FillRectangleToVram ILLEGAL_PARAMETER"
 //THUMB_FN(0xe02b07c3, marv_dcache_clean) // JC: incorr | find _rgb_vram_info, this function is called with
 // that address as only param, after null check.
 // Function inspects the struct and does dcache_clean
 // on the extent of the bitmap_data.  Not referenced
 // much.  Possibly only used during init?
-//THUMB_FN(0xe02ba483, JediDraw) // JC: incorr | maybe sends a buffer to 2d accel unit, for output / render?
-//THUMB_FN(0xe048f6e7, OsdReverseMode) // JC: incorr | "OsdReverseMode" - does this flip the OSD output?
-//THUMB_FN(0xe025e88d, XimrSetLayerVisibility) // JC: incorr
-//THUMB_FN(0xe025e8ad, XimrSetInputLayerMARV) // JC: incorr
-//THUMB_FN(0xe025ea65, XimrSetLayer_unk2) // JC: incorr
-//THUMB_FN(0xe025eaed, maybe_XimrSetLayerColorParams) // JC: incorr
-//THUMB_FN(0xe025e949, XimrContextInputLayerSetDimensions) // JC: incorr
-//THUMB_FN(0xe021ded9, WinSys_AllocateMemory) // JC: incorr
-//THUMB_FN(0xe01fa5e8, WinSys_FreeMemory) // JC corr?: "WinSys_FreeMemory"
+//THUMB_FN(0xe02ba483, JediDraw) // JC: incorrect | maybe sends a buffer to 2d accel unit, for output / render?
+//THUMB_FN(0xe048f6e7, OsdReverseMode) // JC: incorrect| "OsdReverseMode" - does this flip the OSD output?
+//THUMB_FN(0xe025e88d, XimrSetLayerVisibility) // JC: incorrect
+//THUMB_FN(0xe025e8ad, XimrSetInputLayerMARV) // JC: incorrect
+//THUMB_FN(0xe025ea65, XimrSetLayer_unk2) // JC: incorrect
+//THUMB_FN(0xe025eaed, maybe_XimrSetLayerColorParams) // JC: incorrect
+//THUMB_FN(0xe025e949, XimrContextInputLayerSetDimensions) // JC: incorrect
+//THUMB_FN(0xe021ded9, WinSys_AllocateMemory) // JC: incorrecet
+//THUMB_FN(0xe01fa5e8, WinSys_FreeMemory)
 
 
 // SJE not yet sure how this one works on 850D,
@@ -301,7 +305,7 @@ THUMB_FN(0xe000be02, uart_printf)  // JC: updated
 // you can see fd70 + 0x14, 0x18, 0x1c being used to see which vram buffer
 // is active, or ready maybe.
 
-DATA_PTR( 0x116f0,  _rgb_vram_info) // JC: looks corr (how?), Used in many places, written to in "InitializeScreen"
+DATA_PTR( 0x116f0,  _rgb_vram_info) // JC: need to validate, Used in many places, written to in "InitializeScreen"
  // At least for 200D, this is BGRA buffer, earlier in the render
  // chain than the YUV ones.  But, changes made to it will not
  // render until a refresh occurs (can manually trigger via RefreshVrmsSurface()),
@@ -318,14 +322,14 @@ THUMB_FN(0xe05cc7de,  dm_set_store_level) // JC: ?? | called by "dmstore"
 										  //  MFD: REPLACED WITH POSSIBLE Entry  under "[DM] Priority Escalation!!!!"
 										  //  MFD: REPLACED WITH POSSIBLE Entry  under "[DM] Priority Escalation!!!!"
   // is logged.
-THUMB_FN(0xe00b08dc,  task_trampoline)   //  JC. not a func | MFD: REPLACED WITH POSSIBLE Entry
+THUMB_FN(0xe00b08dc,  task_trampoline)   //  JC: incorrect | MFD: REPLACED WITH POSSIBLE Entry
 
 
-//JC: not validated
 ARM32_FN(0xe00177ac,  memcpy_dryos) // useful in early contexts when we don't have
 // dietlibc or newlib, and can't use stdio memcpy64 because
 // that wants ML assert handling initialised.
 
+// JC: can't find this
 THUMB_FN(0xDFFE8EA0,  dcache_clean_multicore) /* loop writing to c11007b0, called after dcache_clean by copy_mmu_tables() */
 
 
