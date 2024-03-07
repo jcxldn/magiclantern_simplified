@@ -168,7 +168,7 @@ NSTUB(0x0234e5c4,  dm_names) // JC: seems correct?? | in DebugMsg, before the 1s
 NSTUB(   0x0235e09c,  sd_device) // JC: unsure in sdReadBlk, probably 0xe02b6fa2.  Lots of refs //MFD: updated with possible entry
   // to 0x1fd7c, some to 0x1fd80
 
-NSTUB(0x234e8ec,  gui_main_struct) // JC: UNSURE! | See function using "Queue Clear event" string, e020bae8
+NSTUB(0x234e8ec,  gui_main_struct) // See function using "Queue Clear event" string, e020bae8
    // There's a base of struct, and some refs to fields via offsets.
    // Find the right one.
 //THUMB_FN(0xe00c54ab,  GUI_ChangeMode) // JC: unsure | "GUI_ChangeMode:%d" string
@@ -275,32 +275,33 @@ THUMB_FN(0xe000be02, uart_printf)  // JC: updated
 // JC: untouched underneath
 
 // These are not required, but have been used for experiments, debugging, etc
-//THUMB_FN(0xe049f041, fill_rectangle_to_vram) // "FillRectangleToVram ILLEGAL_PARAMETER"
-//THUMB_FN(0xe02b07c3, marv_dcache_clean) // find _rgb_vram_info, this function is called with
+//THUMB_FN(0xe049f041, fill_rectangle_to_vram) // JC: incorr | "FillRectangleToVram ILLEGAL_PARAMETER"
+//THUMB_FN(0xe02b07c3, marv_dcache_clean) // JC: incorr | find _rgb_vram_info, this function is called with
 // that address as only param, after null check.
 // Function inspects the struct and does dcache_clean
 // on the extent of the bitmap_data.  Not referenced
 // much.  Possibly only used during init?
-//THUMB_FN(0xe02ba483, JediDraw) // maybe sends a buffer to 2d accel unit, for output / render?
-//THUMB_FN(0xe048f6e7, OsdReverseMode) // "OsdReverseMode" - does this flip the OSD output?
-//THUMB_FN(0xe025e88d, XimrSetLayerVisibility)
-//THUMB_FN(0xe025e8ad, XimrSetInputLayerMARV)
-//THUMB_FN(0xe025ea65, XimrSetLayer_unk2)
-//THUMB_FN(0xe025eaed, maybe_XimrSetLayerColorParams)
-//THUMB_FN(0xe025e949, XimrContextInputLayerSetDimensions)
-//THUMB_FN(0xe021ded9, WinSys_AllocateMemory)
-//THUMB_FN(0xe01fa5e8, WinSys_FreeMemory)   MFD: REPLACED WITH POSSIBLE Entry
+//THUMB_FN(0xe02ba483, JediDraw) // JC: incorr | maybe sends a buffer to 2d accel unit, for output / render?
+//THUMB_FN(0xe048f6e7, OsdReverseMode) // JC: incorr | "OsdReverseMode" - does this flip the OSD output?
+//THUMB_FN(0xe025e88d, XimrSetLayerVisibility) // JC: incorr
+//THUMB_FN(0xe025e8ad, XimrSetInputLayerMARV) // JC: incorr
+//THUMB_FN(0xe025ea65, XimrSetLayer_unk2) // JC: incorr
+//THUMB_FN(0xe025eaed, maybe_XimrSetLayerColorParams) // JC: incorr
+//THUMB_FN(0xe025e949, XimrContextInputLayerSetDimensions) // JC: incorr
+//THUMB_FN(0xe021ded9, WinSys_AllocateMemory) // JC: incorr
+//THUMB_FN(0xe01fa5e8, WinSys_FreeMemory) // JC corr?: "WinSys_FreeMemory"
 
 
 // SJE not yet sure how this one works on 850D,
 // looks quite different or I'm reading it wrong
-#DATA_PTR(   0xfd84,  bmp_vram_info) // function e04a044c looks relevant, see refs to 0x3c0 and 0x21c; 960x540
+// JC: poss incorr? not validated.
+#DATA_PTR(   0xfd84,  bmp_vram_info) // function e04a044c [JC: no such func on 90D] looks relevant, see refs to 0x3c0 and 0x21c; 960x540
 // 0xfda0 seems bool for whether it's in 960x540 or 720x480.
 // 0xfd70 looks like a struct base, at the end of this func
 // you can see fd70 + 0x14, 0x18, 0x1c being used to see which vram buffer
 // is active, or ready maybe.
 
-DATA_PTR( 0x116f0,  _rgb_vram_info) // JC: looks corr, Used in many places, written to in "InitializeScreen"
+DATA_PTR( 0x116f0,  _rgb_vram_info) // JC: looks corr (how?), Used in many places, written to in "InitializeScreen"
  // At least for 200D, this is BGRA buffer, earlier in the render
  // chain than the YUV ones.  But, changes made to it will not
  // render until a refresh occurs (can manually trigger via RefreshVrmsSurface()),
