@@ -117,7 +117,7 @@ THUMB_FN(0xe05b0930, FIO_DelayRemove) // Prints and then calls FIO_DelayFlush
 
 /** GUI **/
 //THUMB_FN(0xe05cc2c4,  GUI_Control) // JC: unsure | Looks missing on 850D, possibly same as R 
-THUMB_FN(0xe059377e,  SetGUIRequestMode) // JC unsure | Code is quite different from earlier cams, not a big switch? MFD: UPDATED WITH POSSIBLE ENTRY. CODE IS A LITTLE DIFFERENT
+THUMB_FN(0xe059383a,  SetGUIRequestMode) // JC: +0xBC | Code is quite different from earlier cams, not a big switch?
  // Possibly weird decomp?  Param is the same though, maybe it still works
 THUMB_FN(0xe057c68c,  gui_init_end) // JC: matched to EndGuiInit | DNE on R, but does on 850D
 THUMB_FN(0xe020b240,  gui_main_task)//JC: matched to GUI.c | MFD: UPDATED WITH POSSIBLE ENTRY
@@ -167,7 +167,8 @@ THUMB_FN(0xe0397950, _get_task_info_by_id) //JC: matches to a function | MFD: up
 NSTUB(0x0234e5c4,  dm_names) // JC: seems correct?? | in DebugMsg, before the 1st loop target //MFD: updated with possible entry
 NSTUB(   0x0235e09c,  sd_device) // JC: unsure in sdReadBlk, probably 0xe02b6fa2.  Lots of refs //MFD: updated with possible entry
   // to 0x1fd7c, some to 0x1fd80
-NSTUB(0x234e8ec,  gui_main_struct) // JC: unsure how to proceeed | See function using "Queue Clear event" string, e020bae8
+
+NSTUB(0x234e8ec,  gui_main_struct) // JC: UNSURE! | See function using "Queue Clear event" string, e020bae8
    // There's a base of struct, and some refs to fields via offsets.
    // Find the right one.
 //THUMB_FN(0xe00c54ab,  GUI_ChangeMode) // JC: unsure | "GUI_ChangeMode:%d" string
@@ -212,16 +213,16 @@ THUMB_FN(0xe05b2c44,  msg_queue_create) // CreateMessageQueue - In 50D, msg_queu
 // the equiv of which is 0xdf00b114 (and was easier to find) MDF: REPLACED WITH POSSIBLE ENTRY
 THUMB_FN(0xe05bdf8c,  prop_deliver) // used near "UNKNOWN PROPERTY ID " in call to DryosDebugMsg
 THUMB_FN(0xe05bda96,  prop_register_slave)
-DATA_PTR( 0x23585b4,  LiveViewApp_dialog) // JC, seems incorrect | in StartLiveViewApp()
-THUMB_FN(0xe044ffae,  LiveViewApp_handler) // DebugMsg: "StartLiveViewApp(%#x)", address passed to CreateDialogBox
-THUMB_FN(0xe07a3cb4,  LiveViewShutterApp_handler) // DebugMsg: "StartLiveViewShutterApp", address passed to CreateDialogBox
-THUMB_FN(0xe032c392,  PlayMovieGuideApp_handler) // "PlayMovieGuide_Start"
-THUMB_FN(0xe0560144,  PlayMain_handler) // JC: unsure, incorrect? | DebugMsg: "StartPlayMain", address passed to CreateDialogBox
-THUMB_FN(0xe0704b12,  ShootOlcApp_handler) // near "StopShootOlcApp PopPalette(%d)" MFD: REPLACED WITH POSSIBLE Entry
-THUMB_FN(0xe08dd04e,  GetCFnData) // JC: unsure | "GetCFnData" Function sig is different but the body looks similar.  MFD: REPLACED WITH POSSIBLE Entry
+DATA_PTR(0xeb80,  LiveViewApp_dialog) // in StartLiveViewApp()
+THUMB_FN(0xe04518e8,  LiveViewApp_handler) // DebugMsg: "StartLiveViewApp(%#x)", address passed to CreateDialogBox
+THUMB_FN(0xe07a3cea,  LiveViewShutterApp_handler) // DebugMsg: "StartLiveViewShutterApp", address passed to CreateDialogBox
+THUMB_FN(0xe032c6c0,  PlayMovieGuideApp_handler) // "PlayMovieGuide_Start"
+THUMB_FN(0xe0561bb6,  PlayMain_handler) // DebugMsg: "StartPlayMain", address passed to CreateDialogBox
+THUMB_FN(0xe07053f0,  ShootOlcApp_handler) // near "StopShootOlcApp PopPalette(%d)" 
+THUMB_FN(0xe08dbc18,  GetCFnData) // "GetCFnData" Function sig is different but the body looks similar.  MFD: REPLACED WITH POSSIBLE Entry
   // Looks like the inner functions use registers the outer doesn't, which confuses Ghidra
   // re how many args outer takes.
-THUMB_FN(0xe08dbd2a,  SetCFnData) // JC: "SetCFnMappingData" There are some "SetCFnData" related strings MFD: REPLACED WITH POSSIBLE Entry
+THUMB_FN(0xe08dcacc,  SetCFnData) // JC: "SetCFnMappingData" There are some "SetCFnData" related strings MFD: REPLACED WITH POSSIBLE Entry
   // SJE size of struct has changed, don't know if this is relevant
 
 // Not required on 200D given usage by ML is always behind cam specific guards.
@@ -299,7 +300,7 @@ THUMB_FN(0xe000be02, uart_printf)  // JC: updated
 // you can see fd70 + 0x14, 0x18, 0x1c being used to see which vram buffer
 // is active, or ready maybe.
 
-DATA_PTR( 0x235b2bc,  _rgb_vram_info) // JC: looks corr, Used in many places, written to in "InitializeScreen"
+DATA_PTR( 0x116f0,  _rgb_vram_info) // JC: looks corr, Used in many places, written to in "InitializeScreen"
  // At least for 200D, this is BGRA buffer, earlier in the render
  // chain than the YUV ones.  But, changes made to it will not
  // render until a refresh occurs (can manually trigger via RefreshVrmsSurface()),
