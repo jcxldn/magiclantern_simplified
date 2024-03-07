@@ -279,8 +279,8 @@ THUMB_FN(0xe000be02, uart_printf)
    // Both seem to work the same.
 
 // These are not required, but have been used for experiments, debugging, etc
-//THUMB_FN(0xe02bedb4, fill_rectangle_to_vram) // "FillRectangleToVram ILLEGAL_PARAMETER"
-//THUMB_FN(0xe02b07c3, marv_dcache_clean) // JC: incorr | find _rgb_vram_info, this function is called with
+THUMB_FN(0xe02bedb4, fill_rectangle_to_vram) // JC: CONFIRMED | "FillRectangleToVram ILLEGAL_PARAMETER"
+THUMB_FN(0xe02b07c3, marv_dcache_clean) // JC: CONFIRMED | find _rgb_vram_info, this function is called with
 // that address as only param, after null check.
 // Function inspects the struct and does dcache_clean
 // on the extent of the bitmap_data.  Not referenced
@@ -305,7 +305,7 @@ THUMB_FN(0xe000be02, uart_printf)
 // you can see fd70 + 0x14, 0x18, 0x1c being used to see which vram buffer
 // is active, or ready maybe.
 
-DATA_PTR( 0x116f0,  _rgb_vram_info) // JC: need to validate, Used in many places, written to in "InitializeScreen"
+DATA_PTR( 0x235b2bc,  _rgb_vram_info) // JC: CONFIRMED | Used in many places, written to in "InitializeScreen"
  // At least for 200D, this is BGRA buffer, earlier in the render
  // chain than the YUV ones.  But, changes made to it will not
  // render until a refresh occurs (can manually trigger via RefreshVrmsSurface()),
