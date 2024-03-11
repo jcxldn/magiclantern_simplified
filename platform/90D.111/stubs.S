@@ -263,7 +263,7 @@ NSTUB(0x0235b190,  gui_task_list) // JC: untouched, incorrect | Strings have cha
    // Found via checking all call sites of CreateRecursiveLock()
    // and comparing with 200d until similar code found.
    // gui_task_list is lock related
-THUMB_FN(0xe083c674, _LoadCalendarFromRTC)  //JC: untouched, incorrect | MDF: REPLACED WITH POSSIBLE ENTRY
+THUMB_FN(0xe083ca70, _LoadCalendarFromRTC)
  
 
 // These are required on Digic 678
