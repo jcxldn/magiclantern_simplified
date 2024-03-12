@@ -317,14 +317,18 @@ SIZE_CHECK_STRUCT( prop_lens_static_data, 0x180 );
 SIZE_CHECK_STRUCT( prop_lens_static_data, 0x184 );
 #endif // size check M50, R, RP, 250D
 
-#elif defined(CONFIG_850D) || defined(CONFIG_R6) || defined(CONFIG_R5)
+#elif defined(CONFIG_850D) || defined(CONFIG_90D) || defined(CONFIG_R6) || defined(CONFIG_R5)
 /* new struct variant reorders some fields as compared to previous
  * thus making a separate definition */
 struct prop_lens_static_data
 {
         uint8_t                 attached;
         uint8_t                 type;
+#if !defined(CONFIG_90D)
         uint8_t                _unk_01[38];                    // Not referenced in readid
+#else
+        uint8_t                 _unk_01[37]; // 90D: one bit less than usual.
+#endif
         uint16_t                lens_id;
         uint16_t                lens_id_ext;
         uint16_t                fl_wide;
@@ -335,14 +339,20 @@ struct prop_lens_static_data
         uint8_t                 lens_firm_ver[3];
         uint8_t                 field_vision;
         uint8_t                 lens_type;
+#if !defined(CONFIG_90D)
         uint8_t                 extenderMountInfo;
+#endif
         uint8_t                 lens_name_len;
         char                    lens_name[73];
+#if !defined(CONFIG_90D)
         uint8_t                _unk_03[65];                    // Not referenced in readid
+#else
+        uint8_t                _unk_03;
+#endif
         uint8_t                 mount_size;
         uint8_t                 lens_switch_exists;
-        uint8_t                 lens_af_func_exists;
-        uint8_t                 lens_mf_funct_exists;
+        uint8_t                 lens_af_func_exists;    // 90D: not referenced in readid
+        uint8_t                 lens_mf_funct_exists;   // 90D: not referenced in readid
         uint8_t                 lens_is_switch_exists;
         uint8_t                 lens_is_funct_exists;
         uint8_t                 af_speed_setting_available;
@@ -353,20 +363,24 @@ struct prop_lens_static_data
         uint8_t                 emd_hot_limit;
 #if defined(CONFIG_R6) || defined(CONFIG_R5)
         uint8_t                 aberationControl;              // DNE on 850D
-        uint8_t                 _pad_01;
 #endif // defined(CONFIG_R6) || defined(CONFIG_R5)
+#if defined(CONFIG_R6) || defined(CONFIG_R5) || defined(CONFIG_90D)
+        uint8_t                 _pad_01;
+#endif // defined(CONFIG_R6) || defined(CONFIG_R5) || defined(CONFIG_90D)
         uint16_t                zoom_pos_size;
         uint16_t                focus_pos_size;
         uint16_t                fine_focus_size;
-        uint16_t                av_slow_div;
+        uint16_t                av_slow_div;    // 90D: referenced as "av_stop_div"
         uint8_t                 av_slow_enable;
         uint8_t                 av_dlp_lens;
         uint16_t                av_dlp_max_spd;
         uint16_t                av_dlp_silent_spd;
         uint16_t                av_dlp_min_spd;
         uint8_t                _unk_04[150];
+#if !defined(CONFIG_90D)
         uint8_t                 extendMagnificationVal;
         uint8_t                _unk_05;
+#endif
         uint16_t                ois_shift_max;
 #if defined(CONFIG_R6) || defined(CONFIG_R5)
         uint8_t                 colorBalance;                  // DNE on 850D
@@ -379,6 +393,9 @@ struct prop_lens_static_data
 #if defined(CONFIG_850D)
         uint8_t                _pad_02[3];
 #endif //defined(CONFIG_850D)
+#if defined(CONFIG_90D)
+        uint8_t                _pad_02;
+#endif // defined(CONFIG_90D)
         uint32_t                dlAdpl_id;
         uint8_t                 dlAdpl_funcl;
         uint8_t                 dlAdpl_firm_ver[3];
@@ -391,7 +408,12 @@ struct prop_lens_static_data
         uint8_t                _unk_07[13];
 };
 
+#if !defined(CONFIG_90D)
 SIZE_CHECK_STRUCT( prop_lens_static_data, 0x1C8 );
+#else // is 90D
+SIZE_CHECK_STRUCT( prop_lens_static_data, 0x184 );
+#endif // defined(CONFIG_90D)
+
 #else  // unknown model
 #error No PROP_LENS_STATIC_DATA defined for built cam model
 #endif // unknown model
@@ -420,7 +442,7 @@ struct prop_lens_dynamic_data {
         uint16_t                AVMAX;            // ShootingInfoEx: avmax
 #if !defined(CONFIG_M50)
         uint16_t                AVD;              // Not referenced in M50
-#if defined(CONFIG_850D) || defined(CONFIG_R6)  || defined(CONFIG_R5)
+#if defined(CONFIG_850D) || defined(CONFIG_90D) || defined(CONFIG_R6)  || defined(CONFIG_R5)
         uint16_t                NowAvRF;          // Referenced 850D, R6
 #endif
         uint16_t                NowAvEF;          // Not referenced in M50. Before 850D named just NowAv
@@ -504,7 +526,7 @@ struct prop_lens_dynamic_data {
 
 #if defined(CONFIG_R5) || defined(CONFIG_R6)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x94 );
-#elif defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_850D)
+#elif defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_850D) || defined(CONFIG_90D)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x90);
 #elif defined(CONFIG_250D) || defined(CONFIG_SX740)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x8C);

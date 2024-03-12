@@ -414,6 +414,15 @@ static int get_default_white_level()
     -922, 10000,    2319, 10000,    5565, 10000
 #endif
 
+#ifdef CONFIG_90D // from https://github.com/LibRaw/LibRaw src/tables/colordata.cpp
+// { LIBRAW_CAMERAMAKER_Canon, "EOS 90D", 0, 0,
+//    { 11498, -3759, -1516, -5073, 12954,  2349,  -892,  1867,  6118}},
+#define CAM_COLORMATRIX1 \
+    11498, 10000,   -3759, 10000,   -1516, 10000, \
+    -5073, 10000,   12954, 10000,   2349, 10000, \
+    -892, 10000,    1867, 10000,    6118, 10000
+#endif
+
 #ifdef CONFIG_6D2 // from https://github.com/LibRaw/LibRaw src/tables/colordata.cpp
     //{ LIBRAW_CAMERAMAKER_Canon, "EOS 6D Mark II", 0, 0x38de,
     //  { 6875,-970,-932,-4691,12459,2501,-874,1953,5809 } },
@@ -573,6 +582,12 @@ static int dynamic_ranges[] = {1317, 1264, 1176, 1092, 1005, 921, 840, 731, 644}
 #ifdef CONFIG_850D
 // SJE FIXME - dxomark didn't have 850D listed, check again in the future.
 // For now, copied from R.
+static int dynamic_ranges[] = {1255, 1237, 1188, 1120, 1045, 964, 883, 785, 685, 599, 507};
+#endif
+
+#ifdef CONFIG_90D
+// FIXME - dxomark didn't have 90D listed, check again in the future.
+// For now, copied from 850D (copied from R).
 static int dynamic_ranges[] = {1255, 1237, 1188, 1120, 1045, 964, 883, 785, 685, 599, 507};
 #endif
 
