@@ -244,9 +244,9 @@ THUMB_FN(0xe0757f10, _free)  // however, the inital stubs for 200D call these si
 														 //  MDF: REPLACED WITH POSSIBLE ENTRY
 
 THUMB_FN(0xe05be040, _prop_cleanup) // JC: incorrect, has two arguments. | "./Multicast/PropertyMgr.c" check funcs that ref this string
-THUMB_FN(0xe05cb688,  CreateRecursiveLock) // JC: incorrect, takes int arg. | via "KerRLock.c", CRL() calls a function that regs this string, not many do
-THUMB_FN(0xe05a955c, AcquireRecursiveLock) // JC: incorrect, two params.
-THUMB_FN(0xe05a9626,  ReleaseRecursiveLock) // JC: possibly correct, sig matches
+THUMB_FN(0xe05a9686,  CreateRecursiveLock) // takes int arg. | via "KerRLock.c", CRL() calls a function that regs this string, not many do
+THUMB_FN(0xe05a955c, AcquireRecursiveLock)
+THUMB_FN(0xe05a9626,  ReleaseRecursiveLock)
 THUMB_FN(0xe059758e,  dialog_redraw) // JC: unsure | Found via checking xrefs to "pDialog->pSignature == pcSignature"  //MDF: REPLACED WITH POSSIBLE ENTRY
 //THUMB_FN(0xe04b3739,  CreateResLockEntry) // JC: untouched | via xrefs to a pointer to "ResInfo"
 //THUMB_FN(0xe04b3b59,  LockEngineResources) // JC: untouched | Down a bit from CreateResLockEntry, start v similar but end is different.
