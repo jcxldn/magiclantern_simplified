@@ -255,6 +255,29 @@ DATA_PTR(   0x0235b308,  display_refresh_needed) // if 0, RefreshVrmsSurface() d
 THUMB_FN(0xe0194248, XimrExe) // trigger Ximr unit to execute (HW compositor, partially understood)
 DATA_PTR(   0x0235b2f4,  winsys_sem)
 
+/**
+ * Things needed for CONFIG_COMPOSITOR_XCM.
+ *
+ * R uses two layers (GUI, focus overlays). WINSYS code swaps pointer in
+ * WINSYS structure (one we know as _rgb_vram_info) to select which layer to
+ * draw.
+ *
+ * With FEATURE_COMPOSITOR_XCM we ask XCM via XCM_GetSourceSurface to give us
+ * pointer to layer 0, which is more reliable.
+ */
+THUMB_FN(0xe00bde2c, XCM_GetSourceSurface)                  // by debug message
+//THUMB_FN(0xe00bd96e, XCM_MakeContext)                     // by debug message. Not used in code, left for reference below.
+DATA_PTR(    0x148bec, _pXCM);
+
+/**
+ * Stubs needed for CONFIG_XCM_DEDICATED_LAYER
+ */
+DATA_PTR(  0x148a78, RENDERER_LayersMetadata); // JC: ?? poss valiue     // accessed in for loop in RENDERER_InitializeScreen()
+THUMB_FN(0xe00bdb76, XCM_SetSourceSurface);
+THUMB_FN(0xe00bde60, XCM_SetSourceArea);
+THUMB_FN(0xe02c0c78, XOC_SetLayerEnable);
+THUMB_FN(0xe02c0f12, XCM_SetColorMatrixType);
+
 // These are not strictly required, although recent dev work has added dependencies;
 // these likely should be removed before a "real" release
 THUMB_FN(0xe05b7058, uart_printf)

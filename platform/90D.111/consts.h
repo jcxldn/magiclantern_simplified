@@ -66,6 +66,8 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define DRYOS_ASSERT_HANDLER 0x234d564   // Used early in a function I've named debug_assert
 #define CURRENT_GUI_MODE (*(int*)0x23518d8) // see SetGUIRequestMode, 0x65c8 + 0x5c on 200D
 
+
+// -- JC: NOT CHECKED -- 
 #define GUIMODE_PLAY 8194
 #define GUIMODE_MENU 8195
 #define GUIMODE_WB 8199
@@ -82,6 +84,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define PLAY_MODE (gui_state == GUISTATE_PLAYMENU && CURRENT_GUI_MODE == GUIMODE_PLAY)
 #define MENU_MODE (gui_state == GUISTATE_PLAYMENU && CURRENT_GUI_MODE == GUIMODE_MENU)
 
+
 // In SetGUIRequestMode, look at what code calls NotifyGUIEvent(9, something)...
 // But this is very different in 850D.  Earlier cams passed a value that was mapped
 // via a switch statement to get a small integer (0 to 0xf on R, for example).
@@ -89,10 +92,12 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 // integer directly.
 #define GUIMODE_ML_MENU (lv ? 0x9078 : GUIMODE_MENU)
 
+// -- JC UNCHECKED END --
+
 // could be either of these two, maybe even both?  Wants testing on real cam
 //#define DISPLAY_SENSOR_POWERED (*(int *))(0xb074) // SJE unsure.  Function has changed a lot
 //#define DISPLAY_SENSOR_POWERED (*(int *))(0x5b950) // "lcd_disp_pwr_on"
-#define DISPLAY_SENSOR_POWERED (*(int *))(0x76288) // "lcd_disp_pwr_on"
+#define DISPLAY_SENSOR_POWERED (*(int *))(0x76288) // "lcd_disp_pwr_on" - JC
 
 #define DISPLAY_IS_ON (*(int *)0x2354a6c)          // "DispOperator_PropertyMasterSetDisplayTurnOffOn"
 
@@ -105,8 +110,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define MALLOC_STRUCT 0x43044
 #define MALLOC_FREE_MEMORY (MEM(MALLOC_STRUCT + 8) - MEM(MALLOC_STRUCT + 0x1C)) // "Total Size" - "Allocated Size"
 
-
-#define GMT_FUNCTABLE 0xe0999590 // JC: unsure
+#define GMT_FUNCTABLE 0xe099998c
 #define GMT_NFUNCS 0x7
 
 // Find a function that manually initialises some large struct, then calls
@@ -119,9 +123,10 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 
 // This is the 90d struct base but I haven't checked the related CONTROL_BV fields, etc.
 // These may have altered.
-#define LVAE_STRUCT 0x6a228
+#define LVAE_STRUCT 0x6a228 // JC: inherited
 
 
+// JC: how to check these?
 #define CONTROL_BV      (*(uint16_t*)(LVAE_STRUCT+0x28)) // via "lvae_setcontrolbv"
 #define CONTROL_BV_TV   (*(uint16_t*)(LVAE_STRUCT+0x3e)) // via "lvae_setcontrolaeparam"
 #define CONTROL_BV_AV   (*(uint16_t*)(LVAE_STRUCT+0x40)) // via "lvae_setcontrolaeparam"
@@ -137,7 +142,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 // SJE ">> FstpasDesign" gets you a function using that string near the top,
 // earlier there are calls, one of these returns the struct address.
 // The 2nd one for me, but check with how DryosDebugMsg() calls use the value later on.
-#define LVAE_ISO_STRUCT 0x8ef10 // JC: likely fine
+#define LVAE_ISO_STRUCT 0x8ef10
 #define LVAE_ISO_MIN    (*(uint8_t* )LVAE_ISO_STRUCT + 0x0E ) // via string: ISOMin:%d
 
 //Replaced by CONFIG_NO_BFNT in internals.h
@@ -148,7 +153,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 
 #define AUDIO_MONITORING_HEADPHONES_CONNECTED 0
 #define INFO_BTN_NAME "INFO"
-#define Q_BTN_NAME "Q/SET"
+#define Q_BTN_NAME "Q"
 // Disabled to to "../../src/menuindex.c:128:6: error: #error Please remove unused definition of ARROW_MODE_TOGGLE_KEY."
 // #define ARROW_MODE_TOGGLE_KEY "FUNC"
 
@@ -161,7 +166,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define LEDOFF                      0x4c0003
 
 //address of XimrContext structure to redraw in FEATURE_VRAM_RGBA
-#define XIMR_CONTEXT 0xca3f10
+#define XIMR_CONTEXT 0xb74310 // JC: pulled from cam
 // On D7, there is only one.  On D8, there are multiple, and another
 // level of indirection.  We need to pull this from a running cam / qemu
 
@@ -193,17 +198,17 @@ extern int winsys_bmp_dirty_bit_neg;
 #define YUV422_HD_BUFFER_DMA_ADDR 0x0 // it expects this to be shamem_read(some_DMA_ADDR)
 
 #define YUV422_LV_BUFFER_1 0x9F420000 // these three are IMG_VRAM1, 2, 3 in smemShowFix
-#define YUV422_LV_BUFFER_2 0x9F814800
+#define YUV422_LV_BUFFER_2 0x9F814800 // JC: all three correct
 #define YUV422_LV_BUFFER_3 0x9FC09000
 
 #define YUV422_LV_PITCH 1440
 #define LV_BOTTOM_BAR_DISPLAYED 0x0 // wrong, fake bool
-//#define MALLOC_FREE_MEMORY 0
-// below definitely wrong, just copied from 50D
-#define FRAME_SHUTTER *(uint8_t*)(MEM(LV_STRUCT_PTR) + 0x56)
-#define FRAME_APERTURE *(uint8_t*)(MEM(LV_STRUCT_PTR) + 0x57)
-#define FRAME_ISO *(uint16_t*)(MEM(LV_STRUCT_PTR) + 0x58)
-#define FRAME_SHUTTER_TIMER *(uint16_t*)(MEM(LV_STRUCT_PTR) + 0x5c)
+// #define MALLOC_FREE_MEMORY 0
+//  below definitely wrong, just copied from 50D
+#define FRAME_SHUTTER *(uint8_t *)(MEM(LV_STRUCT_PTR) + 0x56)
+#define FRAME_APERTURE *(uint8_t *)(MEM(LV_STRUCT_PTR) + 0x57)
+#define FRAME_ISO *(uint16_t *)(MEM(LV_STRUCT_PTR) + 0x58)
+#define FRAME_SHUTTER_TIMER *(uint16_t *)(MEM(LV_STRUCT_PTR) + 0x5c)
 #define FRAME_BV ((int)FRAME_SHUTTER + (int)FRAME_APERTURE - (int)FRAME_ISO)
 // this block all copied from 50D, and probably wrong, though likely safe
 #define FASTEST_SHUTTER_SPEED_RAW 160
@@ -214,19 +219,19 @@ extern int winsys_bmp_dirty_bit_neg;
 #define AF_BTN_HALFSHUTTER 0
 #define AF_BTN_STAR 2
 
-#define MVR_190_STRUCT (*(void**)0x0)
-#define div_maybe(a,b) ((a)/(b))
+#define MVR_190_STRUCT (*(void **)0x0)
+#define div_maybe(a, b) ((a) / (b))
 // see mvrGetBufferUsage, which is not really safe to call => err70
 // macros copied from arm-console
 #define MVR_BUFFER_USAGE 70 // wrong, but needs to be non-zero to avoid a compiler warning
-       /* obviously wrong, don't try and record video
-       // div_maybe(-100*MEM(236 + MVR_190_STRUCT) - \
-       // 100*MEM(244 + MVR_190_STRUCT) - 100*MEM(384 + MVR_190_STRUCT) - \
-       // 100*MEM(392 + MVR_190_STRUCT) + 100*MEM(240 + MVR_190_STRUCT) + \
-       // 100*MEM(248 + MVR_190_STRUCT), \
-       // - MEM(236 + MVR_190_STRUCT) - MEM(244 + MVR_190_STRUCT) + \
-       // MEM(240 + MVR_190_STRUCT) +  MEM(248 + MVR_190_STRUCT)) */
-#define MVR_FRAME_NUMBER (*(int*)(220 + MVR_190_STRUCT))
+    /* obviously wrong, don't try and record video
+    // div_maybe(-100*MEM(236 + MVR_190_STRUCT) - \
+    // 100*MEM(244 + MVR_190_STRUCT) - 100*MEM(384 + MVR_190_STRUCT) - \
+    // 100*MEM(392 + MVR_190_STRUCT) + 100*MEM(240 + MVR_190_STRUCT) + \
+    // 100*MEM(248 + MVR_190_STRUCT), \
+    // - MEM(236 + MVR_190_STRUCT) - MEM(244 + MVR_190_STRUCT) + \
+    // MEM(240 + MVR_190_STRUCT) +  MEM(248 + MVR_190_STRUCT)) */
+#define MVR_FRAME_NUMBER (*(int *)(220 + MVR_190_STRUCT))
 //#define MVR_LAST_FRAME_SIZE (*(int*)(512 + MVR_752_STRUCT))
 #define MVR_BYTES_WRITTEN MEM((212 + MVR_190_STRUCT))
 
@@ -235,4 +240,3 @@ extern int winsys_bmp_dirty_bit_neg;
 // SJE new stuff added after we have ML menus working!
 // Not needed for early code.
 #define CANON_SHUTTER_RATING 100000
-
