@@ -442,7 +442,7 @@ struct prop_lens_dynamic_data {
         uint16_t                AVMAX;            // ShootingInfoEx: avmax
 #if !defined(CONFIG_M50)
         uint16_t                AVD;              // Not referenced in M50
-#if defined(CONFIG_850D) || defined(CONFIG_90D) || defined(CONFIG_R6)  || defined(CONFIG_R5)
+#if defined(CONFIG_850D) || defined(CONFIG_R6)  || defined(CONFIG_R5)
         uint16_t                NowAvRF;          // Referenced 850D, R6
 #endif
         uint16_t                NowAvEF;          // Not referenced in M50. Before 850D named just NowAv
@@ -451,7 +451,7 @@ struct prop_lens_dynamic_data {
         uint16_t                jsstep;
         uint8_t                _pad_02[4];        // M50, R, RP, 250D, 850D, R6
         uint16_t                IDC;
-#if !defined(CONFIG_M50) && !defined(CONFIG_250D) && !defined(CONFIG_SX740)
+#if !defined(CONFIG_M50) && !defined(CONFIG_250D) && !defined(CONFIG_SX740) && !defined(CONFIG_90D)
         uint8_t                _pad_03[2];        // R, RP, 850D, R6; not on M50, 250D (alignment?)
 #endif
         uint16_t                po;
@@ -526,9 +526,9 @@ struct prop_lens_dynamic_data {
 
 #if defined(CONFIG_R5) || defined(CONFIG_R6)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x94 );
-#elif defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_850D) || defined(CONFIG_90D)
+#elif defined(CONFIG_SX70) || defined(CONFIG_R) || defined(CONFIG_RP) || defined(CONFIG_850D)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x90);
-#elif defined(CONFIG_250D) || defined(CONFIG_SX740)
+#elif defined(CONFIG_250D) || defined(CONFIG_SX740) || defined(CONFIG_90D)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x8C);
 #elif defined(CONFIG_M50)
 SIZE_CHECK_STRUCT( prop_lens_dynamic_data, 0x84);
