@@ -14,6 +14,9 @@
 // has LV
 #define CONFIG_LIVEVIEW
 
+// Battery reports exact percentage
+#define CONFIG_BATTERY_INFO
+
 // enable state objects hooks
 // REF: Commented out in 9cab5f63c5f0bee288f11988aa3ab3a923882f6c (Mar 3, 2024 | 90: Platform dir. Does not build)
 #define CONFIG_STATE_OBJECT_HOOKS

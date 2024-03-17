@@ -4,6 +4,11 @@
 
 #define FEATURE_SHOW_SHUTTER_COUNT
 
+// working but incomplete, some allocators don't report
+// anything yet as they're faked / not yet found
+// JC: Triggers Err 70 when clicking on Free Memory entry
+// #define FEATURE_SHOW_FREE_MEMORY
+
 #define FEATURE_SCREENSHOT
 
 #define FEATURE_DONT_CLICK_ME
