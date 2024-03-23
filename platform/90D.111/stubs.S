@@ -296,7 +296,8 @@ NSTUB(0x0,  LCD_Palette) // Not required / changed in D8
 
 DATA_PTR(0x0234d6b8,  task_dispatch_hook)
 THUMB_FN(0xe05bdb64, _prop_request_change)
-THUMB_FN(0xe05cc8c2,  dm_set_store_level) // JC: ?? | called by "dmstore"
+THUMB_FN(0xe05cc8c2,  dm_set_store_level)
+//THUMB_FN(0xe05cc87c,  dm_set_print_level)
   // Called in init_task(), shortly before ICU Firmware version string is logged.
 THUMB_FN(0xe00b08dc,  task_trampoline)
 
