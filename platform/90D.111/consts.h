@@ -66,11 +66,50 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define DRYOS_ASSERT_HANDLER 0x234d564   // Used early in a function I've named debug_assert
 #define CURRENT_GUI_MODE (*(int*)0x23518d8) // see SetGUIRequestMode, 0x65c8 + 0x5c on 200D
 
-
-// -- JC: NOT CHECKED -- 
+ 
+// LV, photo mode 0 
 #define GUIMODE_PLAY 8194
 #define GUIMODE_MENU 8195
-#define GUIMODE_WB 8199
+//#define GUIMODE_WIFI_SETTINGS 8229 // Same as photo mode wifi touch button
+
+// LiveView Touch Buttons
+//#define GUIMODE_LV_SHUTTER_TOUCH 36981
+//#define GUIMODE_LV_EXPCOMP_TOUCH 36983
+#define GUIMODE_LV_ISO_TOUCH 36984
+
+// Common LiveView, Photo mode buttons
+//#define GUIMODE_Q_BTN 49223 // same for LV and photo mode
+
+// Photo Mode Touch Buttons
+//#define GUIMODE_PHOTO_ISO_TOUCH 53322
+//#define GUIMODE_PHOTO_EXPCOMP_TOUCH 53323
+//#define GUIMODE_PHOTO_FLASH_EXPCOMP_TOUCH 53324
+//#define GUIMODE_PHOTO_PICSTYLE_TOUCH 53326
+//#define GUIMODE_PHOTO_WB_TOUCH 53327
+//#define GUIMODE_PHOTO_METERING_MODE_TOUCH 53328
+//#define GUIMODE_PHOTO_IMG_QUALITY_TOUCH 53329
+//#define GUIMODE_PHOTO_AF_OPERATION_TOUCH 53330
+//#define GUIMODE_PHOTO_DRIVE_MODE_TOUCH 53331
+//#define GUIMODE_PHOTO_CUSTOM_CONTROLS_TOUCH 53332
+//#define GUIMODE_PHOTO_ALO_TOUCH 53333
+#define GUIMODE_PHOTO_AF_MODE_TOUCH 61584 // opens ML menu
+
+// Photo Mode Top buttons
+//#define GUIMODE_PHOTO_ISO_BTN 65682
+//#define GUIMODE_PHOTO_AF_BTN 65684
+//#define GUIMODE_PHOTO_DRIVE_BTN 65685
+//#define GUIMODE_PHOTO_METERING_MODE_BTN 65686
+
+// LiveView Top Buttons
+//#define GUIMODE_LV_ISO_BTN 65695
+//#define GUIMODE_LV_DRIVE_BTN 65697
+//#define GUIMODE_LV_METERING_MODE_BTN 65698
+//#define GUIMODE_LV_AF_BTN 65699
+
+
+//Old gui modes below (copied from 850D?)
+
+#define GUIMODE_WB 8199  //
 #define GUIMODE_FOCUS_MODE 8203 // assuming this is "AF operation" menu
                                 // but there is also AF focus point selection,
                                 // which is 61585
@@ -81,6 +120,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 #define GUIMODE_FLASH_AE 0x22
 #define GUIMODE_PICQ 6
 
+
 #define PLAY_MODE (gui_state == GUISTATE_PLAYMENU && CURRENT_GUI_MODE == GUIMODE_PLAY)
 #define MENU_MODE (gui_state == GUISTATE_PLAYMENU && CURRENT_GUI_MODE == GUIMODE_MENU)
 
@@ -90,9 +130,7 @@ DryOS base    user_start                                 sys_objs_start    sys_s
 // via a switch statement to get a small integer (0 to 0xf on R, for example).
 // 850D passes in e.g. 0x9076 and shifts the low 3 nybbles out to get the
 // integer directly.
-#define GUIMODE_ML_MENU (lv ? 0x9078 : GUIMODE_MENU)
-
-// -- JC UNCHECKED END --
+#define GUIMODE_ML_MENU (lv ? GUIMODE_LV_ISO_TOUCH : GUIMODE_PHOTO_AF_MODE_TOUCH)
 
 // could be either of these two, maybe even both?  Wants testing on real cam
 //#define DISPLAY_SENSOR_POWERED (*(int *))(0xb074) // SJE unsure.  Function has changed a lot
