@@ -19,5 +19,5 @@ ML_MODULES ?= \
 	selftest \
 	adv_int \
 	crop_rec \
-	edmac \
+	dev_tools/edmac \
 	yolo \
