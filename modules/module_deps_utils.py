@@ -13,17 +13,19 @@ class ModuleError(Exception):
 class Module:
     def __init__(self, name):
         # We expect to be run in the modules dir,
-        # so the name is also the name of a subdir.
+        # so the name should be a subdir, but, it can be
+        # deeper than one dir, e.g. raw_video/mlv_lite,
+        # or file_man
         #
-        # E.g. dot_tune, and we expect these related
-        # files to exist:
-        # modules/dot_tune/dot_tune.mo
-        # modules/dot_tune/dot_tune.dep
-        # modules/dot_tune/dot_tune.sym
-        self.mo_file = os.path.join(name, name + ".mo")
-        self.dep_file = os.path.join(name, name + ".dep")
-        self.sym_file = os.path.join(name, name + ".sym")
-        self.name = name
+        # We expect these files to exist:
+        # modules/raw_video/mlv_lite/mlv_lite.mo
+        # modules/raw_video/mlv_lite/mlv_lite.dep
+        # modules/raw_video/mlv_lite/mlv_lite.sym
+        module_name = os.path.split(name)[1]
+        self.mo_file = os.path.join(name, module_name + ".mo")
+        self.dep_file = os.path.join(name, module_name + ".dep")
+        self.sym_file = os.path.join(name, module_name + ".sym")
+        self.name = module_name
         #self.required_mods = None # deliberately not set, so we can easily
                                    # distinguish between empty and not-initialised
 

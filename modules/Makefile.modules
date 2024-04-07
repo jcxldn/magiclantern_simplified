@@ -1,4 +1,7 @@
-    TOP_DIR?=../..
+# If not already defined, we assume this file is being included
+# from modules/some_module_dir
+TOP_DIR?=../..
+
 ML_SETUP_DISABLE_USER_CONFIGS=y
 ML_SETUP_EXTENSION=modules
 
@@ -39,7 +42,7 @@ clean::
 
 #module_strings.h: README.rst hgstamp
 module_strings.h: README.rst
-	$(call build,README, $(PYTHON) ../readme2modulestrings.py > $@ || rm -f $@)
+	$(call build,README, $(PYTHON) $(TOP_DIR)/modules/readme2modulestrings.py > $@ || rm -f $@)
 
 README.rst:
 	$(call build,README,printf "$(MODULE_NAME)\n========\n\nPlease write a one-page description for your module here.\n\nYou may also add some metadata:\n\n:Author: <your name here>\n:License: <your license here>\n:Website: <your website here>\n\n" > $@)
