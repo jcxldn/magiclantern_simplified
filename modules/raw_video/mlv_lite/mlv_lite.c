@@ -53,10 +53,10 @@
 #include <math.h>
 #include <cropmarks.h>
 #include <screenshot.h>
-#include "../lv_rec/lv_rec.h"
+#include "../../lv_rec/lv_rec.h"
 #include "edmac.h"
 #include "edmac-memcpy.h"
-#include "../file_man/file_man.h"
+#include "../../file_man/file_man.h"
 #include "patch.h"
 #include "lvinfo.h"
 #include "beep.h"
@@ -68,13 +68,13 @@
 #include "fps.h"
 #include "../mlv_rec/mlv.h"
 #include "../mlv_rec/mlv_rec_interface.h"
-#include "../trace/trace.h"
+#include "../../trace/trace.h"
 #include "powersave.h"
 #include "shoot.h"
 #include "fileprefix.h"
 #include "timer.h"
 #include "ml-cbr.h"
-#include "../silent/lossless.h"
+#include "../../silent/lossless.h"
 #include "ml-cbr.h"
 
 THREAD_ROLE(RawRecTask);            /* our raw recording task */

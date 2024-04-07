@@ -32,7 +32,7 @@
 #include <raw.h>
 #include "ml-cbr.h"
 
-#include "../trace/trace.h"
+#include "../../trace/trace.h"
 #include "../mlv_rec/mlv.h"
 #include "../mlv_rec/mlv_rec_interface.h"
 

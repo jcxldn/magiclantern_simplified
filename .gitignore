@@ -101,10 +101,15 @@ modules/*/*.dep
 modules/*/*.mo
 modules/*/*.sym
 modules/*/*.rsc
+modules/*/*/*.dep
+modules/*/*/*.mo
+modules/*/*/*.sym
+modules/*/*/*.rsc
 modules/*/hgstamp
 modules/*/hgdiff.tmp
 modules/*/hginfo.tmp
 modules/*/module_strings.h
+modules/*/*/module_strings.h
 modules/raw_rec/raw2dng
 modules/raw_rec/raw2dng.exe
 modules/tcc/localsyms

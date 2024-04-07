@@ -69,8 +69,8 @@
 #include <fileprefix.h>
 #include <raw.h>
 #include <patch.h>
-#include "../mlv_rec/mlv.h"
-#include "../mlv_rec/mlv_rec_interface.h"
+#include "../raw_video/mlv_rec/mlv.h"
+#include "../raw_video/mlv_rec/mlv_rec_interface.h"
 
 static CONFIG_INT("isoless.hdr", isoless_hdr, 0);
 static CONFIG_INT("isoless.iso", isoless_recovery_iso, 3);

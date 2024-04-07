@@ -29,7 +29,7 @@
 #include <fps.h>
 
 #include "mlv.h"
-#include "../trace/trace.h"
+#include "../../trace/trace.h"
 
 extern uint32_t raw_rec_trace_ctx;
 

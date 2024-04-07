@@ -18,7 +18,7 @@
 #include <fps.h>
 #include <chdk-dng.h>
 #include "../lv_rec/lv_rec.h"
-#include "../mlv_rec/mlv.h"
+#include "../raw_video/mlv_rec/mlv.h"
 #include "lossless.h"
 
 static uint64_t ret_0_long() { return 0; }

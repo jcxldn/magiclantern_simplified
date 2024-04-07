@@ -1,10 +1,11 @@
+TOP_DIR=../../..
 
 # define the module name - make sure name is max 8 characters
 MODULE_NAME=mlv_rec
 MODULE_OBJS=mlv_rec.o mlv.o
 
 # include modules environment
-include ../Makefile.modules
+include $(TOP_DIR)/modules/Makefile.modules
 
 MLV_CFLAGS = -I$(SRC_DIR) -D MLV_USE_LZMA -D MLV_USE_LJ92 -Wpadded -mno-ms-bitfields -D _7ZIP_ST
 MLV_LFLAGS = 

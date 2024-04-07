@@ -75,10 +75,10 @@
 #include <shoot.h>
 #include <powersave.h>
 
-#include "../lv_rec/lv_rec.h"
-#include "../file_man/file_man.h"
-#include "../ime_base/ime_base.h"
-#include "../trace/trace.h"
+#include "../../lv_rec/lv_rec.h"
+#include "../../file_man/file_man.h"
+#include "../../ime_base/ime_base.h"
+#include "../../trace/trace.h"
 
 #include "mlv.h"
 #include "mlv_rec_interface.h"

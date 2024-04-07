@@ -39,13 +39,13 @@
 
 #include <string.h>
 
-#include "../ime_base/ime_base.h"
-#include "../trace/trace.h"
+#include "../../ime_base/ime_base.h"
+#include "../../trace/trace.h"
 #include "../mlv_rec/mlv.h"
-#include "../file_man/file_man.h"
-#include "../lv_rec/lv_rec.h"
-#include "../raw_twk/raw_twk.h"
-#include "../silent/lossless.h"
+#include "../../file_man/file_man.h"
+#include "../../lv_rec/lv_rec.h"
+#include "../../raw_twk/raw_twk.h"
+#include "../../silent/lossless.h"
 #include "console.h"
 
 /* uncomment for live debug messages */
