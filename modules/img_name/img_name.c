@@ -8,7 +8,7 @@
 #include <fileprefix.h>
 #include <config.h>
 
-#include "../ime_base/ime_base.h"
+#include "../input/ime_base/ime_base.h"
 
 static char default_prefix[8];
 static char prefix[8];
