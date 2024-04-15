@@ -555,43 +555,6 @@ int patch_instruction(
 }
 
 /**
- * Engio register lists
- * ====================
- */
-
-int patch_engio_list(uint32_t *engio_list, uint32_t patched_register, uint32_t patched_value, const char *description)
-{
-    while (*engio_list != 0xFFFFFFFF)
-    {
-        uint32_t reg = *engio_list;
-        if (reg == patched_register)
-        {
-            /* evil hack that relies on unused LSB bits on the register address */
-            /* this will cause Canon code to ignore this register and keep our patched value */
-            *(engio_list) = patched_register + 1;
-            return patch_memory((uintptr_t)(engio_list+1), engio_list[1], patched_value, description);
-        }
-        engio_list += 2;
-    }
-    return E_PATCH_REG_NOT_FOUND;
-}
-
-int unpatch_engio_list(uint32_t *engio_list, uint32_t patched_register)
-{
-    while (*engio_list != 0xFFFFFFFF)
-    {
-        uint32_t reg = *engio_list;
-        if (reg == patched_register + 1)
-        {
-            *(engio_list) = patched_register;
-            return unpatch_memory((uintptr_t)(engio_list+1));
-        }
-        engio_list += 2;
-    }
-    return E_UNPATCH_REG_NOT_FOUND;
-}
-
-/**
  * Logging hooks
  * =============
  */

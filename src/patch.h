@@ -60,12 +60,6 @@ int patch_memory(
 /* undo the patching done by one of the above calls */
 int unpatch_memory(uintptr_t addr);
 
-/* patch a ENGIO register in a FFFFFFFF-terminated list */
-/* this will also prevent Canon code from changing that register to some other value (*) */
-/* (*) this will only work for Canon code that looks up the register in a list, sets the value if found, and does no error checking */
-int patch_engio_list(uint32_t *engio_list, uint32_t patched_register, uint32_t patched_value, const char *description);
-int unpatch_engio_list(uint32_t *engio_list, uint32_t patched_register);
-
 /******************************
  * Instruction (code) patches *
  ******************************/
