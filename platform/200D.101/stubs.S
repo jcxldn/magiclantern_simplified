@@ -132,6 +132,9 @@ THUMB_FN(0xE04BC2C5, _FIO_RemoveFile)
 THUMB_FN(0xE04BCBCB, _FIO_RenameFile)
 THUMB_FN(0xE04BCE75,  FIO_Flush)               // to be called after FIO_CloseFile?
 
+//THUMB_FN(0xe0247f6e, set_SD_clock_frequency)
+//THUMB_FN(0xe02b72e8, autotune_SD_maybe)
+
 /** GUI **/
 THUMB_FN(0xE00C5415,  GUI_Control)
 THUMB_FN(0xE04A7EF5,  SetGUIRequestMode)
