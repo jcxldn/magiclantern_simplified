@@ -23,7 +23,7 @@
 #endif
 
 #define MAX_PATCHES 32
-#define MAX_LOGGING_HOOKS 32
+#define MAX_FUNCTION_HOOKS 32
 
 /* for patching a single 32-bit integer (RAM or ROM, data or code) */
 struct patch
@@ -46,17 +46,17 @@ struct patch
 };
 
 /* ASM code from Maqs */
-/* logging hooks are always paired to a simple patch (that does the jump to this code) */
-union logging_hook_code
+/* function hooks using this struct are always paired to a simple patch (that does the jump to this code) */
+union function_hook_code
 {
     struct
     {
-        uint32_t arm_asm[11];       /* ARM ASM code for jumping to the logging function and back */
+        uint32_t arm_asm[11];       /* ARM ASM code for jumping to the hook function and back */
         uint32_t reloc_insn;        /* original instruction, relocated */
         uint32_t jump_back;         /* instruction to jump back to original code */
         uint32_t addr;              /* patched address (for identification) */
         uint32_t fixup;             /* for relocating instructions that do PC-relative addressing */
-        uint32_t logging_function;  /* for long call */
+        uint32_t hook_function;  /* for long call */
     };
 
     uint32_t code[16];
@@ -66,7 +66,7 @@ static struct patch patches[MAX_PATCHES] = {{0}};
 static int num_patches = 0;
 
 /* at startup we don't have malloc, so we allocate it statically */
-static union logging_hook_code logging_hooks[MAX_LOGGING_HOOKS];
+static union function_hook_code function_hooks[MAX_FUNCTION_HOOKS];
 
 /**
  * Common routines
@@ -512,12 +512,12 @@ int unpatch_memory(uintptr_t _addr)
     }
     num_patches--;
 
-    /* also look in up in the logging hooks, and zero it out if found */
-    for (int i = 0; i < MAX_LOGGING_HOOKS; i++)
+    /* also look it up in the function hooks, and zero it out if found */
+    for (int i = 0; i < MAX_FUNCTION_HOOKS; i++)
     {
-        if (logging_hooks[i].addr == _addr)
+        if (function_hooks[i].addr == _addr)
         {
-            memset(&logging_hooks[i], 0, sizeof(union logging_hook_code));
+            memset(&function_hooks[i], 0, sizeof(union function_hook_code));
         }
     }
 
@@ -631,33 +631,34 @@ static int check_jump_range(uint32_t pc, uint32_t dest)
     return 1;
 }
 
-int patch_hook_function(uintptr_t addr, uint32_t orig_instr, patch_hook_function_cbr logging_function, const char *description)
+int patch_hook_function(uintptr_t addr, uint32_t orig_instr,
+                        patch_hook_function_cbr hook_function, const char *description)
 {
     int err = 0;
 
     /* ensure thread safety */
     uint32_t old_int = cli();
     
-    /* find a free slot in logging_hooks */
-    int logging_slot = -1;
-    for (int i = 0; i < COUNT(logging_hooks); i++)
+    /* find a free slot in function_hooks */
+    int slot = -1;
+    for (int i = 0; i < COUNT(function_hooks); i++)
     {
-        if (logging_hooks[i].addr == 0)
+        if (function_hooks[i].addr == 0)
         {
-            logging_slot = i;
+            slot = i;
             break;
         }
     }
     
-    if (logging_slot < 0)
+    if (slot < 0)
     {
-        snprintf(last_error, sizeof(last_error), "Patch error at %x (no logging slot)", addr);
+        snprintf(last_error, sizeof(last_error), "Patch error at %x (no slot)", addr);
         puts(last_error);
         err = E_PATCH_TOO_MANY_PATCHES;
         goto end;
     }
     
-    union logging_hook_code *hook = &logging_hooks[logging_slot];
+    union function_hook_code *hook = &function_hooks[slot];
     
     /* check the jumps we are going to use */
     /* fixme: use long jumps? */
@@ -670,16 +671,16 @@ int patch_hook_function(uintptr_t addr, uint32_t orig_instr, patch_hook_function
         goto end;
     }
     
-    /* create the logging code */
-    *hook = (union logging_hook_code) { .code = {
+    /* create the hook code */
+    *hook = (union function_hook_code) { .code = {
         0xe92d5fff,     /* STMFD  SP!, {R0-R12,LR}  ; save all regs to stack */
         0xe10f0000,     /* MRS    R0, CPSR          ; save CPSR (flags) */
         0xe92d0001,     /* STMFD  SP!, {R0}         ; to stack */
-        0xe28d0004,     /* ADD    R0, SP, #4        ; pass them to logging function as first arg */
-        0xe28d103c,     /* ADD    R1, SP, #60       ; pass stack pointer to logging function */
-        0xe59f2018,     /* LDR    R2, [PC,#24]      ; pass patched address to logging function */
+        0xe28d0004,     /* ADD    R0, SP, #4        ; pass them to hook function as first arg */
+        0xe28d103c,     /* ADD    R1, SP, #60       ; pass stack pointer to hook function */
+        0xe59f2018,     /* LDR    R2, [PC,#24]      ; pass patched address to hook function */
         0xe1a0e00f,     /* MOV    LR, PC            ; setup return address for long call */
-        0xe59ff018,     /* LDR    PC, [PC,#24]      ; long call to logging_function */
+        0xe59ff018,     /* LDR    PC, [PC,#24]      ; long call to hook_function */
         0xe8bd0001,     /* LDMFD  SP!, {R0}         ; restore CPSR */
         0xe128f000,     /* MSR    CPSR_f, R0        ; (flags only) from stack */
         0xe8bd5fff,     /* LDMFD  SP!, {R0-R12,LR}  ; restore regs */
@@ -691,19 +692,19 @@ int patch_hook_function(uintptr_t addr, uint32_t orig_instr, patch_hook_function
         B_INSTR(&hook->jump_back, addr + 4),/*      ; jump back to original code */
         addr,                               /*      ; patched address (for identification) */
         hook->fixup,                        /*      ; this is updated by reloc_instr */
-        (uint32_t) logging_function,
+        (uint32_t)hook_function,
     }};
 
     /* since we have modified some code in RAM, sync the caches */
     sync_caches();
     
-    /* patch the original instruction to jump to the logging code */
+    /* patch the original instruction to jump to the hook code */
     err = patch_instruction(addr, orig_instr, B_INSTR(addr, hook), description);
     
     if (err)
     {
         /* something went wrong? */
-        memset(hook, 0, sizeof(union logging_hook_code));
+        memset(hook, 0, sizeof(union function_hook_code));
         goto end;
     }
 
