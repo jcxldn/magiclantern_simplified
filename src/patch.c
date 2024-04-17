@@ -82,7 +82,7 @@ static void check_cache_lock_still_needed();
 int _reapply_cache_patches();
 
 /* lock or unlock the cache as needed */
-static void cache_require(int lock)
+static void set_cache_lock_state(int lock)
 {
 #ifdef CONFIG_QEMU
     return;
@@ -222,7 +222,7 @@ static int do_patch(uint8_t *addr, uint32_t value, int is_instruction)
     if (IS_ROM_PTR(addr))
     {
         /* todo: check for conflicts (@g3gg0?) */
-        cache_require(1);
+        set_cache_lock_state(1);
         
         int cache_type = is_instruction ? TYPE_ICACHE : TYPE_DCACHE;
         if (cache_is_patchable((uint32_t)addr, cache_type, 0))
@@ -465,7 +465,7 @@ static void check_cache_lock_still_needed()
     if (!rom_patches)
     {
         /* nope, we don't */
-        cache_require(0);
+        set_cache_lock_state(0);
     }
 }
 
