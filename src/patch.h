@@ -45,7 +45,7 @@
 
 // Reads value at address, truncated according to alignment of addr.
 // E.g. reads from 0x1001 return only 1 byte.
-uint32_t read_value(uint32_t *addr, int is_instruction);
+uint32_t read_value(uint8_t *addr, int is_instruction);
 
 /* simple data patch */
 int patch_memory(

@@ -228,7 +228,7 @@ static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* ba
         // We can't read values directly on ARMv5 due to unaligned read behaviour
         // interacting with do_patch() / read_value() behaviour.
         for (int i = 0; i < count; i++)
-            backup[i] = read_value((uint32_t *)(start_addr + size * i), 0);
+            backup[i] = read_value((uint8_t *)(start_addr + size * i), 0);
 
         // SJE FIXME this is rather ugly.  Can we use any of the sanity
         // checks below?  Needs investigating.  Can we find appropriate

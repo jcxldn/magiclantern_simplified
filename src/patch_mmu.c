@@ -694,7 +694,7 @@ int mmu_init(void)
 // external API declared in patch.h
 //
 
-uint32_t read_value(uint32_t *addr, int is_instruction)
+uint32_t read_value(uint8_t *addr, int is_instruction)
 {
     // On D45 this is more complicated (the name read_value() is quite deceptive!)
     // We keep this function to provide the same API

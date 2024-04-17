@@ -28,11 +28,21 @@
 /* for patching a single 32-bit integer (RAM or ROM, data or code) */
 struct patch
 {
-    uint32_t *addr;                 /* first memory address to patch (RAM or ROM) */
-    uint32_t backup;                /* old value (to undo the patch) */
-    uint32_t patched_value;         /* value after patching */
-    const char *description;        /* will be displayed in the menu as help text */
-    unsigned is_instruction: 1;     /* if 1, we have patched an instruction (needs extra care with the instruction cache) */
+    uint8_t *addr; // first memory address to patch (RAM or ROM)
+    union
+    {
+        uint8_t *old_values; // pre-patch values at addr (to undo the patch)
+        uint32_t old_value; // if change is small enough, store directly
+    };
+    union
+    {
+        uint8_t *new_values; // values after patching
+        uint32_t new_value; // if small enough, store directly
+    };
+    uint32_t size; // number of bytes of values to patch (D45 cams can only do 4 or less per patch)
+    const char *description; // displayed in the menu as help text
+    unsigned is_instruction: 1; // D45 needs separate code paths for patching via icache or dcache,
+                                // D78X do not and ignore this field.
 };
 
 /* ASM code from Maqs */
@@ -142,7 +152,7 @@ void sync_caches()
 }
 
 /* low-level routines */
-uint32_t read_value(uint32_t *addr, int is_instruction)
+uint32_t read_value(uint8_t *addr, int is_instruction)
 {
 #ifdef CONFIG_QEMU
     goto read_from_ram;
@@ -201,7 +211,7 @@ read_from_ram:
     }
 }
 
-static int do_patch(uint32_t *addr, uint32_t value, int is_instruction)
+static int do_patch(uint8_t *addr, uint32_t value, int is_instruction)
 {
     dbg_printf("Patching %x from %x to %x\n", addr, read_value(addr, is_instruction), value);
 
@@ -310,7 +320,7 @@ static int patch_memory_work(
     const char *description
 )
 {
-    uint32_t *addr = (uint32_t *)_addr;
+    uint8_t *addr = (uint8_t *)_addr;
     int err = E_PATCH_OK;
     
     /* ensure thread safety */
@@ -337,7 +347,8 @@ static int patch_memory_work(
 
     /* fill metadata */
     patches[num_patches].addr = addr;
-    patches[num_patches].patched_value = new_value;
+    patches[num_patches].size = 4;
+    patches[num_patches].new_value = new_value;
     patches[num_patches].is_instruction = is_instruction;
     patches[num_patches].description = description;
 
@@ -352,7 +363,7 @@ static int patch_memory_work(
     }
 
     /* save backup value */
-    patches[num_patches].backup = old;
+    patches[num_patches].old_value = old;
     
     /* checks done, backups saved, now patch */
     err = do_patch(patches[num_patches].addr, new_value, is_instruction);
@@ -380,14 +391,14 @@ end:
 static int is_patch_still_applied(int p)
 {
     uint32_t current = get_patch_current_value(&patches[p]);
-    uint32_t patched = patches[p].patched_value;
+    uint32_t patched = patches[p].new_value;
     return (current == patched);
 }
 
 static int reapply_cache_patch(int p)
 {
     uint32_t current = get_patch_current_value(&patches[p]);
-    uint32_t patched = patches[p].patched_value;
+    uint32_t patched = patches[p].new_value;
     
     if (current != patched)
     {
@@ -460,7 +471,7 @@ static void check_cache_lock_still_needed()
 
 int unpatch_memory(uintptr_t _addr)
 {
-    uint32_t *addr = (uint32_t *)_addr;
+    uint8_t *addr = (uint8_t *)_addr;
     int err = E_UNPATCH_OK;
     uint32_t old_int = cli();
 
@@ -490,7 +501,7 @@ int unpatch_memory(uintptr_t _addr)
     if (!IS_ROM_PTR(addr))
 #endif
     {
-        err = do_patch(patches[p].addr, patches[p].backup, patches[p].is_instruction);
+        err = do_patch(patches[p].addr, patches[p].old_value, patches[p].is_instruction);
         if (err) goto end;
     }
 
@@ -734,12 +745,12 @@ static MENU_UPDATE_FUNC(patch_update)
     MENU_SET_NAME("%s", name);
 
     int val = get_patch_current_value(&patches[p]);
-    int backup = patches[p].backup;
+    int old_value = patches[p].old_value;
 
     /* patch value: do we have enough space to print before and after? */
-    if ((val & 0xFFFF0000) == 0 && (backup & 0xFFFF0000) == 0)
+    if ((val & 0xFFFF0000) == 0 && (old_value & 0xFFFF0000) == 0)
     {
-        MENU_SET_VALUE("%X -> %X", backup, val);
+        MENU_SET_VALUE("%X -> %X", old_value, val);
     }
     else
     {
@@ -748,14 +759,14 @@ static MENU_UPDATE_FUNC(patch_update)
 
     /* some detailed info */
     void *addr = patches[p].addr;
-    MENU_SET_WARNING(MENU_WARN_INFO, "0x%X: 0x%X -> 0x%X.", addr, backup, val);
+    MENU_SET_WARNING(MENU_WARN_INFO, "0x%X: 0x%X -> 0x%X.", addr, old_value, val);
     
     /* was this patch overwritten by somebody else? */
     if (!is_patch_still_applied(p))
     {
         MENU_SET_WARNING(MENU_WARN_NOT_WORKING,
             "Patch %x overwritten (expected %x, got %x).",
-            patches[p].addr, patches[p].patched_value, get_patch_current_value(&patches[p])
+            patches[p].addr, patches[p].new_value, get_patch_current_value(&patches[p])
         );
     }
 }
@@ -789,7 +800,7 @@ static MENU_UPDATE_FUNC(patches_update)
             {
                 snprintf(last_error, sizeof(last_error), 
                     "Patch %x overwritten (expected %x, current value %x).",
-                    patches[i].addr, patches[i].patched_value, get_patch_current_value(&patches[i])
+                    patches[i].addr, patches[i].new_value, get_patch_current_value(&patches[i])
                 );
                 puts(last_error);
                 errors++;
