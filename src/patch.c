@@ -41,8 +41,8 @@ struct patch
     };
     uint32_t size; // number of bytes of values to patch (D45 cams can only do 4 or less per patch)
     const char *description; // displayed in the menu as help text
-    unsigned is_instruction: 1; // D45 needs separate code paths for patching via icache or dcache,
-                                // D78X do not and ignore this field.
+    uint8_t is_instruction; // D45 needs separate code paths for patching via icache or dcache,
+                            // D78X do not and ignore this field.
 };
 
 /* ASM code from Maqs */
