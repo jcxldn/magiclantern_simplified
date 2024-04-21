@@ -25,26 +25,6 @@
 #define MAX_PATCHES 32
 #define MAX_FUNCTION_HOOKS 32
 
-/* for patching a single 32-bit integer (RAM or ROM, data or code) */
-struct patch
-{
-    uint8_t *addr; // first memory address to patch (RAM or ROM)
-    union
-    {
-        uint8_t *old_values; // pre-patch values at addr (to undo the patch)
-        uint32_t old_value; // if change is small enough, store directly
-    };
-    union
-    {
-        uint8_t *new_values; // values after patching
-        uint32_t new_value; // if small enough, store directly
-    };
-    uint32_t size; // number of bytes of values to patch (D45 cams can only do 4 or less per patch)
-    const char *description; // displayed in the menu as help text
-    uint8_t is_instruction; // D45 needs separate code paths for patching via icache or dcache,
-                            // D78X do not and ignore this field.
-};
-
 /* ASM code from Maqs */
 /* function hooks using this struct are always paired to a simple patch (that does the jump to this code) */
 union function_hook_code
@@ -62,7 +42,7 @@ union function_hook_code
     uint32_t code[16];
 };
 
-static struct patch patches[MAX_PATCHES] = {{0}};
+static struct patch patches_global[MAX_PATCHES] = {{0}};
 static int num_patches = 0;
 
 /* at startup we don't have malloc, so we allocate it statically */
@@ -308,26 +288,36 @@ static uint32_t get_patch_current_value(struct patch *p)
     return read_value(p->addr, p->is_instruction);
 }
 
-static int patch_memory_work(
-    uintptr_t _addr,
-    uint32_t old_value,
-    uint32_t new_value,
-    uint32_t is_instruction,
-    const char *description
-)
+// Given an array of patch structs, and a count of elements in
+// said array, either apply all patches or none.
+// If any error is returned, no patches have been applied.
+// If E_PATCH_OK is returned, all applied successfully.
+//
+// If count is > 1, patches are grouped into a patchset,
+// which changes both display of the patches in debug menu,
+// and means unpatching any of the contained patches triggers
+// unpatching of all patches in the set.
+int apply_patches(struct patch *patches, uint32_t count)
 {
-    uint8_t *addr = (uint8_t *)_addr;
     int err = E_PATCH_OK;
+
+// Ugly hack to test the change to pass in patches.
+// Currently, all external code should only pass in one, 4-byte patch,
+// since it hasn't been updated with patchsets in mind.
+// Future work will refactor that.
+if (count == 1 && patches[0].size == 4)
+{
+    struct patch *patch = patches;
     
     /* ensure thread safety */
     uint32_t old_int = cli();
 
-    dbg_printf("patch_memory_work(%x)\n", addr);
+    dbg_printf("patch_memory_work(%x)\n", patch->addr);
 
     /* is this address already patched? refuse to patch it twice */
     for (int i = 0; i < num_patches; i++)
     {
-        if (patches[i].addr == addr)
+        if (patches_global[i].addr == patch->addr)
         {
             err = E_PATCH_ALREADY_PATCHED;
             goto end;
@@ -335,75 +325,79 @@ static int patch_memory_work(
     }
 
     /* do we have room for a new patch? */
-    if (num_patches >= COUNT(patches))
+    if (num_patches >= COUNT(patches_global))
     {
         err = E_PATCH_TOO_MANY_PATCHES;
         goto end;
     }
 
     /* fill metadata */
-    patches[num_patches].addr = addr;
-    patches[num_patches].size = 4;
-    patches[num_patches].new_value = new_value;
-    patches[num_patches].is_instruction = is_instruction;
-    patches[num_patches].description = description;
+    patches_global[num_patches].addr = patch->addr;
+    patches_global[num_patches].size = patch->size;
+    patches_global[num_patches].new_value = patch->new_value;
+    patches_global[num_patches].is_instruction = patch->is_instruction;
+    patches_global[num_patches].description = patch->description;
 
     /* are we patching the right thing? */
-    uint32_t old = get_patch_current_value(&patches[num_patches]);
+    uint32_t old = get_patch_current_value(&patches_global[num_patches]);
 
     /* safety check */
-    if (old != old_value)
+    if (old != patch->old_value)
     {
         err = E_PATCH_OLD_VALUE_MISMATCH;
         goto end;
     }
 
     /* save backup value */
-    patches[num_patches].old_value = old;
+    patches_global[num_patches].old_value = old;
     
     /* checks done, backups saved, now patch */
-    err = do_patch(patches[num_patches].addr, new_value, is_instruction);
+    err = do_patch(patches_global[num_patches].addr, patch->new_value, patch->is_instruction);
     if (err) goto end;
     
     /* RAM instructions are patched in RAM (to minimize collisions and only lock down the cache when needed),
      * but we need to clear the cache and re-apply any existing ROM patches */
-    if (is_instruction && !IS_ROM_PTR(addr))
+    if (patch->is_instruction && !IS_ROM_PTR(patch->addr))
     {
         err = _patch_sync_caches(0);
     }
     
     num_patches++;
-    
+
 end:
     if (err)
     {
-        snprintf(last_error, sizeof(last_error), "Patch error at %x (%s)", addr, error_msg(err));
+        snprintf(last_error, sizeof(last_error), "Patch error at %x (%s)", patch->addr, error_msg(err));
         puts(last_error);
     }
     sei(old_int);
+}
+else {
+    err = E_PATCH_TOO_MANY_PATCHES;
+}
     return err;
 }
 
 static int is_patch_still_applied(int p)
 {
-    uint32_t current = get_patch_current_value(&patches[p]);
-    uint32_t patched = patches[p].new_value;
+    uint32_t current = get_patch_current_value(&patches_global[p]);
+    uint32_t patched = patches_global[p].new_value;
     return (current == patched);
 }
 
 static int reapply_cache_patch(int p)
 {
-    uint32_t current = get_patch_current_value(&patches[p]);
-    uint32_t patched = patches[p].new_value;
+    uint32_t current = get_patch_current_value(&patches_global[p]);
+    uint32_t patched = patches_global[p].new_value;
     
     if (current != patched)
     {
-        void *addr = patches[p].addr;
+        void *addr = patches_global[p].addr;
         dbg_printf("Re-applying %x -> %x (changed to %x)\n", addr, patched, current);
-        cache_fake((uint32_t) addr, patched, patches[p].is_instruction ? TYPE_ICACHE : TYPE_DCACHE);
+        cache_fake((uint32_t) addr, patched, patches_global[p].is_instruction ? TYPE_ICACHE : TYPE_DCACHE);
 
         /* did it actually work? */
-        if (read_value(addr, patches[p].is_instruction) != patched)
+        if (read_value(addr, patches_global[p].is_instruction) != patched)
         {
             return E_PATCH_CACHE_ERROR;
         }
@@ -425,7 +419,7 @@ int _reapply_cache_patches()
     
     for (int i = 0; i < num_patches; i++)
     {
-        if (IS_ROM_PTR(patches[i].addr))
+        if (IS_ROM_PTR(patches_global[i].addr))
         {
             err |= reapply_cache_patch(i);
         }
@@ -451,7 +445,7 @@ static void check_cache_lock_still_needed()
     int rom_patches = 0;
     for (int i = 0; i < num_patches; i++)
     {
-        if (IS_ROM_PTR(patches[i].addr))
+        if (IS_ROM_PTR(patches_global[i].addr))
         {
             rom_patches = 1;
             break;
@@ -477,7 +471,7 @@ int unpatch_memory(uintptr_t _addr)
     int p = -1;
     for (int i = 0; i < num_patches; i++)
     {
-        if (patches[i].addr == addr)
+        if (patches_global[i].addr == addr)
         {
             p = i;
             break;
@@ -497,14 +491,15 @@ int unpatch_memory(uintptr_t _addr)
     if (!IS_ROM_PTR(addr))
 #endif
     {
-        err = do_patch(patches[p].addr, patches[p].old_value, patches[p].is_instruction);
+        err = do_patch(patches_global[p].addr, patches_global[p].old_value,
+                       patches_global[p].is_instruction);
         if (err) goto end;
     }
 
     /* remove from our data structure (shift the other array items) */
     for (int i = p + 1; i < num_patches; i++)
     {
-        patches[i-1] = patches[i];
+        patches_global[i-1] = patches_global[i];
     }
     num_patches--;
 
@@ -524,7 +519,7 @@ int unpatch_memory(uintptr_t _addr)
         cache_lock();
         err = _reapply_cache_patches();
     }
-    else if (patches[p].is_instruction)
+    else if (patches_global[p].is_instruction)
     {
         err = _patch_sync_caches(0);
     }
@@ -539,26 +534,6 @@ end:
     }
     sei(old_int);
     return err;
-}
-
-int patch_memory(
-    uintptr_t addr,
-    uint32_t old_value,
-    uint32_t new_value,
-    const char *description
-)
-{
-    return patch_memory_work(addr, old_value, new_value, 0, description);
-}
-
-int patch_instruction(
-    uintptr_t addr,
-    uint32_t old_value,
-    uint32_t new_value,
-    const char *description
-)
-{
-    return patch_memory_work(addr, old_value, new_value, 1, description);
 }
 
 /**
@@ -695,7 +670,16 @@ int patch_hook_function(uintptr_t addr, uint32_t orig_instr,
     sync_caches();
     
     /* patch the original instruction to jump to the hook code */
-    err = patch_instruction(addr, orig_instr, B_INSTR(addr, hook), description);
+    struct patch patch =
+    {
+        .addr = (uint8_t *)addr,
+        .old_value = orig_instr,
+        .new_value = B_INSTR(addr, hook),
+        .size = 4,
+        .description = description,
+        .is_instruction = 1
+    };
+    err = apply_patches(&patch, 1);
     
     if (err)
     {
@@ -724,25 +708,27 @@ static MENU_UPDATE_FUNC(patch_update)
     }
 
     /* long description */
-    MENU_SET_HELP("%s.", patches[p].description);
+    MENU_SET_HELP("%s.", patches_global[p].description);
 
     /* short description: assume the long description is formatted as "module_name: it does this and that" */
     /* => extract module_name and display it as short description */
     char short_desc[16];
-    snprintf(short_desc, sizeof(short_desc), "%s", patches[p].description);
+    snprintf(short_desc, sizeof(short_desc), "%s", patches_global[p].description);
     char *sep = strchr(short_desc, ':');
     if (sep) *sep = 0;
     MENU_SET_RINFO("%s", short_desc);
 
     /* ROM patches are considered invasive, display them with red icon */
-    MENU_SET_ICON(IS_ROM_PTR(patches[p].addr) ? MNI_RECORD : MNI_ON, 0);
+    MENU_SET_ICON(IS_ROM_PTR(patches_global[p].addr) ? MNI_RECORD : MNI_ON, 0);
 
     char name[20];
-    snprintf(name, sizeof(name), "%s: %X", patches[p].is_instruction ? "Code" : "Data", patches[p].addr);
+    snprintf(name, sizeof(name), "%s: %X",
+             patches_global[p].is_instruction ? "Code" : "Data",
+             patches_global[p].addr);
     MENU_SET_NAME("%s", name);
 
-    int val = get_patch_current_value(&patches[p]);
-    int old_value = patches[p].old_value;
+    int val = get_patch_current_value(&patches_global[p]);
+    int old_value = patches_global[p].old_value;
 
     /* patch value: do we have enough space to print before and after? */
     if ((val & 0xFFFF0000) == 0 && (old_value & 0xFFFF0000) == 0)
@@ -755,7 +741,7 @@ static MENU_UPDATE_FUNC(patch_update)
     }
 
     /* some detailed info */
-    void *addr = patches[p].addr;
+    void *addr = patches_global[p].addr;
     MENU_SET_WARNING(MENU_WARN_INFO, "0x%X: 0x%X -> 0x%X.", addr, old_value, val);
     
     /* was this patch overwritten by somebody else? */
@@ -763,7 +749,8 @@ static MENU_UPDATE_FUNC(patch_update)
     {
         MENU_SET_WARNING(MENU_WARN_NOT_WORKING,
             "Patch %x overwritten (expected %x, got %x).",
-            patches[p].addr, patches[p].new_value, get_patch_current_value(&patches[p])
+            patches_global[p].addr, patches_global[p].new_value,
+            get_patch_current_value(&patches_global[p])
         );
     }
 }
@@ -783,7 +770,7 @@ static MENU_UPDATE_FUNC(patches_update)
     {
         if (i < num_patches)
         {
-            if (IS_ROM_PTR(patches[i].addr))
+            if (IS_ROM_PTR(patches_global[i].addr))
             {
                 rom_patches++;
             }
@@ -797,7 +784,8 @@ static MENU_UPDATE_FUNC(patches_update)
             {
                 snprintf(last_error, sizeof(last_error), 
                     "Patch %x overwritten (expected %x, current value %x).",
-                    patches[i].addr, patches[i].new_value, get_patch_current_value(&patches[i])
+                    patches_global[i].addr, patches_global[i].new_value,
+                    get_patch_current_value(&patches_global[i])
                 );
                 puts(last_error);
                 errors++;

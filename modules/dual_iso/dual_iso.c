@@ -190,10 +190,19 @@ static int patch_cmos_iso_values_200d(uint32_t start_addr, int size, int count, 
 
     for (int i = 0; i < count; i++)
     {
-        uint32_t patch_value = 0x0b444000; // 0xRRR ABCD 0, middle 4 are ISO values, RRR is CMOS register
-        uint32_t patch_addr = start_addr + i * size;
-        if (((*(uint32_t *)patch_addr) & 0xfff00000) == 0x0b400000) // sanity check
-            patch_memory(patch_addr, backup[i], patch_value, "dual_iso: CMOS[0] gains");
+        // SJE FIXME convert this to use an array of patches,
+        // so we only call apply_patches() once
+        struct patch patch =
+        {
+            .addr = (uint8_t *)(start_addr + i * size),
+            .old_value = backup[i],
+            .new_value = 0x0b444000, // 0xRRR ABCD 0, middle 4 are ISO values, RRR is CMOS register
+            .size = 4,
+            .description = "dual_iso: CMOS[0] gains",
+            .is_instruction = 1
+        };
+        if (((*(uint32_t *)(patch.addr)) & 0xfff00000) == 0x0b400000) // sanity check
+            apply_patches(&patch, 1);
     }
 
     return 0;
@@ -296,7 +305,18 @@ static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* ba
             patch_value = backup[i] & (~cmos_bits_mask);
 
             patch_value |= cmos_bits; // add the CMOS bits from our target ISO
-            patch_memory(start_addr + i * size, backup[i], patch_value, "dual_iso: CMOS[0] gains");
+            // SJE FIXME convert this to use an array of patches
+            // so we get a patchset
+            struct patch patch =
+            {
+                .addr = (uint8_t *)(start_addr + i * size),
+                .old_value = backup[i],
+                .new_value = patch_value,
+                .size = 4,
+                .description = "dual_iso: CMOS[0] gains",
+                .is_instruction = 1
+            };
+            apply_patches(&patch, 1);
         }
 
         if (is_7d) /* commit the changes on master */

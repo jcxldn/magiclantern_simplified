@@ -2135,10 +2135,16 @@ void hack_liveview(int unhack)
         {
             if (!unhack) /* hack */
             {
-                int err = patch_instruction(
-                    dialog_refresh_timer_addr, dialog_refresh_timer_orig_instr, dialog_refresh_timer_new_instr, 
-                    "raw_rec: slow down Canon dialog refresh timer"
-                );
+                struct patch patch =
+                {
+                    .addr = (uint8_t *)dialog_refresh_timer_addr,
+                    .old_value = dialog_refresh_timer_orig_instr,
+                    .new_value = dialog_refresh_timer_new_instr,
+                    .size = 4,
+                    .description = "raw_rec: slow down Canon dialog refresh timer",
+                    .is_instruction = 1
+                };
+                int err = apply_patches(&patch, 1);
                 
                 if (err)
                 {

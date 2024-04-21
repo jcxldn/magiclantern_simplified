@@ -39,46 +39,42 @@
 #define E_UNPATCH_OVERWRITTEN       0x20000
 #define E_UNPATCH_REG_NOT_FOUND     0x80000
 
-/****************
- * Data patches *
- ****************/
+struct patch
+{
+    uint8_t *addr; // first memory address to patch (RAM or ROM)
+    union
+    {
+        uint8_t *old_values; // pre-patch values at addr (to undo the patch)
+        uint32_t old_value; // if change is small enough, store here directly
+    };
+    union
+    {
+        uint8_t *new_values; // values after patching
+        uint32_t new_value; // if small enough, store here directly
+    };
+    uint32_t size; // number of bytes of values to patch (D45 cams can only do 4 or less per patch)
+    const char *description; // displayed in the menu as help text
+    uint8_t is_instruction; // D45 needs separate code paths for patching via icache or dcache,
+                            // D78X do not and ignore this field.
+};
 
 // Reads value at address, truncated according to alignment of addr.
 // E.g. reads from 0x1001 return only 1 byte.
 uint32_t read_value(uint8_t *addr, int is_instruction);
 
-/* simple data patch */
-int patch_memory(
-    uintptr_t addr,             /* patched address (32 bits) */
-    uint32_t old_value,         /* old value before patching (if it differs, the patch will fail) */
-    uint32_t new_value,         /* new value */
-    const char *description     /* what does this patch do? example: "raw_rec: slowdown dialog timers" */
-                                /* note: you must provide storage for the description string */
-                                /* a string literal will do; a local variable where you sprintf will not work */
-);
+// Given an array of patch structs, and a count of elements in
+// said array, either apply all patches or none.
+// If any error is returned, no patches have been applied.
+// If E_PATCH_OK is returned, all applied successfully.
+//
+// If count is > 1, patches are grouped into a patchset,
+// which changes both display of the patches in debug menu,
+// and means unpatching any of the contained patches triggers
+// unpatching of all patches in the set.
+int apply_patches(struct patch *patches, uint32_t count);
 
-/* undo the patching done by one of the above calls */
+/* undo the patching done by apply_patches or patch_hook_function */
 int unpatch_memory(uintptr_t addr);
-
-/******************************
- * Instruction (code) patches *
- ******************************/
-
-/* patch an executable instruction (will clear the instruction cache) */
-/* same arguments as patch_memory */
-int patch_instruction(
-    uintptr_t addr,
-    uint32_t old_value,
-    uint32_t new_value,
-    const char *description
-);
-
-/* to undo, use unpatch_memory(addr) */
-
-
-/*****************
- * Function hooks *
- *****************/
 
 /* 
  * Hook a custom function in the middle of some ASM code
@@ -97,11 +93,7 @@ int patch_instruction(
  */
 typedef void (*patch_hook_function_cbr)(uint32_t *regs, uint32_t *stack, uint32_t pc);
 
-/* to be called only from a patch_hook_function_cbr */
-#define PATCH_HOOK_CALLER() (regs[13]-4)    /* regs[13] contains LR, not SP */
-
 int patch_hook_function(uintptr_t addr, uint32_t orig_instr, patch_hook_function_cbr hook_function, const char *description);
-
 /* to undo, use unpatch_memory(addr) */
 
 /* cache sync helper */
