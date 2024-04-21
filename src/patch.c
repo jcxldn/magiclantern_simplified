@@ -87,7 +87,7 @@ static void set_cache_lock_state(int lock)
 int _patch_sync_caches(int also_data)
 {
 #ifdef CONFIG_QEMU
-    return 0;
+    return E_PATCH_OK;
 #endif
 
     int err = 0;
@@ -212,7 +212,7 @@ static int do_patch(uint8_t *addr, uint32_t value, int is_instruction)
             }
             
             /* yes! */
-            return 0;
+            return E_PATCH_OK;
         }
         else
         {
@@ -251,7 +251,7 @@ write_to_ram:
             break;
     }
     
-    return 0;
+    return E_PATCH_OK;
 }
 
 static char *error_msg(int err)
@@ -403,13 +403,13 @@ static int reapply_cache_patch(int p)
         }
     }
     
-    return 0;
+    return E_PATCH_OK;
 }
 
 int _reapply_cache_patches()
 {
 #ifdef CONFIG_QEMU
-    return 0;
+    return E_PATCH_OK;
 #endif
 
     int err = 0;
@@ -493,7 +493,8 @@ int unpatch_memory(uintptr_t _addr)
     {
         err = do_patch(patches_global[p].addr, patches_global[p].old_value,
                        patches_global[p].is_instruction);
-        if (err) goto end;
+        if (err)
+            goto end;
     }
 
     /* remove from our data structure (shift the other array items) */
