@@ -477,6 +477,11 @@ int unpatch_memory(uintptr_t _addr)
             break;
         }
     }
+
+    if (p == -1)
+    { // patch not found
+        goto end;
+    }
     
     /* is the patch still applied? */
     if (!is_patch_still_applied(p))
