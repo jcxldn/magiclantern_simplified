@@ -301,80 +301,87 @@ int apply_patches(struct patch *patches, uint32_t count)
 {
     int err = E_PATCH_OK;
 
-// Ugly hack to test the change to pass in patches.
-// Currently, all external code should only pass in one, 4-byte patch,
-// since it hasn't been updated with patchsets in mind.
-// Future work will refactor that.
-if (count == 1 && patches[0].size == 4)
-{
-    struct patch *patch = patches;
-    
     /* ensure thread safety */
     uint32_t old_int = cli();
-
-    dbg_printf("patch_memory_work(%x)\n", patch->addr);
-
-    /* is this address already patched? refuse to patch it twice */
-    for (int i = 0; i < num_patches; i++)
+    uint32_t c = 0;
+    for (; c < count; c++)
     {
-        if (patches_global[i].addr == patch->addr)
+        dbg_printf("patch_memory_work(%x)\n", patches[c].addr);
+
+        // In this transitional code, fail if any patches are an unexpected size.
+        // We don't handle that yet, though we will in the future.
+        if (patches[c].size != 4)
         {
-            err = E_PATCH_ALREADY_PATCHED;
+            err = E_PATCH_UNKNOWN_ERROR;
             goto end;
         }
+
+        /* is this address already patched? refuse to patch it twice */
+        for (int i = 0; i < num_patches; i++)
+        {
+            if (patches_global[i].addr == patches[c].addr)
+            {
+                err = E_PATCH_ALREADY_PATCHED;
+                goto end;
+            }
+        }
+
+        /* do we have room for a new patch? */
+        if (num_patches >= COUNT(patches_global))
+        {
+            err = E_PATCH_TOO_MANY_PATCHES;
+            goto end;
+        }
+
+        /* fill metadata */
+        patches_global[num_patches].addr = patches[c].addr;
+        patches_global[num_patches].size = patches[c].size;
+        patches_global[num_patches].new_value = patches[c].new_value;
+        patches_global[num_patches].is_instruction = patches[c].is_instruction;
+        patches_global[num_patches].description = patches[c].description;
+
+        /* are we patching the right thing? */
+        uint32_t old = get_patch_current_value(&patches_global[num_patches]);
+
+        /* safety check */
+        if (old != patches[c].old_value)
+        {
+            err = E_PATCH_OLD_VALUE_MISMATCH;
+            goto end;
+        }
+
+        /* save backup value */
+        patches_global[num_patches].old_value = old;
+
+        /* checks done, backups saved, now patch */
+        err = do_patch(patches_global[num_patches].addr, patches[c].new_value, patches[c].is_instruction);
+        if (err)
+            goto end;
+
+        /* RAM instructions are patched in RAM (to minimize collisions and only lock down the cache when needed),
+         * but we need to clear the cache and re-apply any existing ROM patches */
+        if (patches[c].is_instruction && !IS_ROM_PTR(patches[c].addr))
+        {
+            err = _patch_sync_caches(0);
+        }
+
+        num_patches++;
     }
-
-    /* do we have room for a new patch? */
-    if (num_patches >= COUNT(patches_global))
-    {
-        err = E_PATCH_TOO_MANY_PATCHES;
-        goto end;
-    }
-
-    /* fill metadata */
-    patches_global[num_patches].addr = patch->addr;
-    patches_global[num_patches].size = patch->size;
-    patches_global[num_patches].new_value = patch->new_value;
-    patches_global[num_patches].is_instruction = patch->is_instruction;
-    patches_global[num_patches].description = patch->description;
-
-    /* are we patching the right thing? */
-    uint32_t old = get_patch_current_value(&patches_global[num_patches]);
-
-    /* safety check */
-    if (old != patch->old_value)
-    {
-        err = E_PATCH_OLD_VALUE_MISMATCH;
-        goto end;
-    }
-
-    /* save backup value */
-    patches_global[num_patches].old_value = old;
-    
-    /* checks done, backups saved, now patch */
-    err = do_patch(patches_global[num_patches].addr, patch->new_value, patch->is_instruction);
-    if (err) goto end;
-    
-    /* RAM instructions are patched in RAM (to minimize collisions and only lock down the cache when needed),
-     * but we need to clear the cache and re-apply any existing ROM patches */
-    if (patch->is_instruction && !IS_ROM_PTR(patch->addr))
-    {
-        err = _patch_sync_caches(0);
-    }
-    
-    num_patches++;
-
 end:
     if (err)
     {
-        snprintf(last_error, sizeof(last_error), "Patch error at %x (%s)", patch->addr, error_msg(err));
+        snprintf(last_error, sizeof(last_error), "Patch error at %x (%s)", patches[c].addr, error_msg(err));
         puts(last_error);
+
+        // undo any prior patches, we want all or none to be applied,
+        // so state is consistent.
+        for (uint32_t c = 0; c < count; c++)
+        {
+            unpatch_memory((uint32_t)(patches[c].addr));
+        }
     }
     sei(old_int);
-}
-else {
-    err = E_PATCH_TOO_MANY_PATCHES;
-}
+
     return err;
 }
 
@@ -467,6 +474,8 @@ int unpatch_memory(uintptr_t _addr)
 
     dbg_printf("unpatch_memory(%x)\n", addr);
 
+    // SJE FIXME this should check if addr
+    // exists within the range of any patch.
     /* find the patch in our data structure */
     int p = -1;
     for (int i = 0; i < num_patches; i++)
@@ -482,7 +491,7 @@ int unpatch_memory(uintptr_t _addr)
     { // patch not found
         goto end;
     }
-    
+
     /* is the patch still applied? */
     if (!is_patch_still_applied(p))
     {
