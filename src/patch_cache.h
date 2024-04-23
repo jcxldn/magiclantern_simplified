@@ -28,7 +28,7 @@ extern int num_patches;
 extern struct patch patches_global[MAX_PATCHES];
 extern union function_hook_code function_hooks[MAX_FUNCTION_HOOKS];
 
-int do_patch(uint8_t *addr, uint32_t value, int is_instruction);
+int apply_patch(struct patch *patch);
 int _sync_locked_caches(int also_data);
 int is_patch_still_applied(int p);
 

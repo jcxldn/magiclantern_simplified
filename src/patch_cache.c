@@ -176,26 +176,30 @@ read_from_ram:
 // This does the actual patching.  Do not use this directly, since it
 // doesn't update various globals e.g. tracking how many patches are applied.
 // Use apply_patches() instead.
-int do_patch(uint8_t *addr, uint32_t value, int is_instruction)
+// SJE TODO - should we instead update global state from here?  Probably.
+int apply_patch(struct patch *patch)
 {
-    dbg_printf("Patching %x from %x to %x\n", addr, read_value(addr, is_instruction), value);
+    dbg_printf("Patching %x from %x to %x\n",
+               patch->addr,
+               read_value(patch->addr, patch->is_instruction),
+               patch->new_value);
 
 #ifdef CONFIG_QEMU
     goto write_to_ram;
 #endif
 
-    if (IS_ROM_PTR(addr))
+    if (IS_ROM_PTR(patch->addr))
     {
         /* todo: check for conflicts (@g3gg0?) */
         set_cache_lock_state(1);
         
-        int cache_type = is_instruction ? TYPE_ICACHE : TYPE_DCACHE;
-        if (cache_is_patchable((uint32_t)addr, cache_type, 0))
+        int cache_type = patch->is_instruction ? TYPE_ICACHE : TYPE_DCACHE;
+        if (cache_is_patchable((uint32_t)patch->addr, cache_type, 0))
         {
-            cache_fake((uint32_t)addr, value, cache_type);
+            cache_fake((uint32_t)patch->addr, patch->new_value, cache_type);
             
             /* did it actually work? */
-            if (read_value(addr, is_instruction) != value)
+            if (read_value(patch->addr, patch->is_instruction) != patch->new_value)
             {
                 return E_PATCH_CACHE_ERROR;
             }
@@ -209,11 +213,11 @@ int do_patch(uint8_t *addr, uint32_t value, int is_instruction)
         }
     }
 
-    if (is_instruction)
+    if (patch->is_instruction)
     {
         /* when patching RAM instructions, bypass the data cache and write directly to RAM */
         /* (will flush the instruction cache later) */
-        addr = UNCACHEABLE(addr);
+        patch->addr = UNCACHEABLE(patch->addr);
     }
 
 #ifdef CONFIG_QEMU
@@ -227,16 +231,16 @@ write_to_ram:
     //
     // The following casts mean that a potentially truncated value
     // gets stored at the expected offset.
-    switch ((uintptr_t)addr & 3)
+    switch ((uintptr_t)patch->addr & 3)
     {
         case 0b00:
-            *(volatile uint32_t *)addr = value;
+            *(volatile uint32_t *)patch->addr = patch->new_value;
             break;
         case 0b10:
-            *(volatile uint16_t *)addr = value;
+            *(volatile uint16_t *)patch->addr = patch->new_value;
             break;
         default:
-            *(volatile uint8_t *)addr = value;
+            *(volatile uint8_t *)patch->addr = patch->new_value;
             break;
     }
     
@@ -492,8 +496,11 @@ int _unpatch_memory(uintptr_t _addr)
     if (!IS_ROM_PTR(addr))
 #endif
     {
-        err = do_patch(patches_global[p].addr, patches_global[p].old_value,
-                       patches_global[p].is_instruction);
+        struct patch patch = patches_global[p];
+        patch.old_value = patches_global[p].new_value;
+        patch.new_value = patches_global[p].old_value;
+
+        err = apply_patch(&patch);
         if (err)
             goto end;
     }

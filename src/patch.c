@@ -111,7 +111,7 @@ int apply_patches(struct patch *patches, uint32_t count)
         patches_global[num_patches].old_value = old;
 
         /* checks done, backups saved, now patch */
-        err = do_patch(patches_global[num_patches].addr, patches[c].new_value, patches[c].is_instruction);
+        err = apply_patch(&(patches[c]));
         if (err)
             goto end;
 
