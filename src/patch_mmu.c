@@ -39,8 +39,8 @@ extern int send_software_interrupt(uint32_t interrupt, uint32_t shifted_cpu_id);
 extern void *memcpy_dryos(void *dst, const void *src, uint32_t count);
 //extern void early_printf(char *fmt, ...);
 
-int assign_64k_to_L2_table(struct region_patch *patch,
-                           struct mmu_L2_page_info *L2_page)
+static int assign_64k_to_L2_table(struct region_patch *patch,
+                                  struct mmu_L2_page_info *L2_page)
 {
     // SJE TODO can / should we use a semaphore here?  I'm not sure we can
     // given the fairly early context we want to call this.
@@ -95,9 +95,9 @@ int assign_64k_to_L2_table(struct region_patch *patch,
 // many patches for the pages, all are in use and the patch
 // doesn't share an address.  Or, that a patch spans a 64kB
 // boundary, this is not handled.
-struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
-                                           struct mmu_L2_page_info *l2_pages,
-                                           uint32_t num_pages)
+static struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
+                                                  struct mmu_L2_page_info *l2_pages,
+                                                  uint32_t num_pages)
 {
     // L2 tables cover 1MB of remapped mem each
 
@@ -157,8 +157,8 @@ struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
 //
 // You shouldn't call this directly, instead use patch_memory(),
 // which handles sleep/wake of cpu1, and ensuring it also takes the patch.
-int apply_data_patch(struct mmu_config *mmu_conf,
-                     struct region_patch *patch)
+static int apply_data_patch(struct mmu_config *mmu_conf,
+                            struct region_patch *patch)
 {
     uint32_t rom_base_addr = ROMBASEADDR & 0xff000000;
     // get original rom and ram memory flags
@@ -235,8 +235,8 @@ int apply_data_patch(struct mmu_config *mmu_conf,
     return 0;
 }
 
-int apply_code_patch(struct mmu_config *mmu_conf,
-                     struct function_hook_patch *patch)
+static int apply_code_patch(struct mmu_config *mmu_conf,
+                            struct function_hook_patch *patch)
 {
     // confirm orig_content matches
     for (uint32_t i = 0; i < 8; i++)
@@ -282,7 +282,7 @@ struct mmu_config global_mmu_conf = {0};
 //
 // This adjusts global_mmu_conf, but doesn't do any
 // copying / setup of MMU structs themselves.
-int calc_mmu_globals(uint32_t start_addr, uint32_t size)
+static int calc_mmu_globals(uint32_t start_addr, uint32_t size)
 {
     // absolute minimum size is 1 64kB page (0x10000),
     // 1 L1 table (0x4900), 1 L2 table (0x400) and
@@ -831,42 +831,5 @@ int unpatch_memory(uintptr_t addr)
 {
     return 0; // SJE FIXME
 }
-
-// patch a ENGIO register in a FFFFFFFF-terminated list
-// this will also prevent Canon code from changing that register to some other value (*)
-// (*) this will only work for Canon code that looks up the register in a list, sets the value if found, and does no error checking
-int patch_engio_list(uint32_t *engio_list, uint32_t patched_register, uint32_t patched_value, const char *description)
-{
-    return 0; // SJE FIXME
-}
-
-int unpatch_engio_list(uint32_t *engio_list, uint32_t patched_register)
-{
-    return 0; // SJE FIXME
-}
-
-/******************************
- * Instruction (code) patches *
- ******************************/
-
-// patch an executable instruction (will clear the instruction cache)
-// same arguments as patch_memory
-int patch_instruction(uintptr_t addr,
-                      uint32_t old_value,
-                      uint32_t new_value,
-                      const char *description)
-{
-    return patch_memory(addr, old_value, new_value, description);
-}
-// to undo, use unpatch_memory(addr)
-
-int _patch_sync_caches(int also_data)
-{
-    return 0; // SJE FIXME
-}
-
-//
-// end external API
-//
 
 #endif // CONFIG_MMU_REMAP
