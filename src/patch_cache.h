@@ -30,7 +30,7 @@ extern union function_hook_code function_hooks[MAX_FUNCTION_HOOKS];
 
 int apply_patch(struct patch *patch);
 int _sync_locked_caches(int also_data);
-int is_patch_still_applied(int p);
+int is_patch_still_applied(struct patch *patch);
 
 #undef PATCH_DEBUG
 

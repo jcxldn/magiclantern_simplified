@@ -200,7 +200,7 @@ static MENU_UPDATE_FUNC(patch_update)
     MENU_SET_WARNING(MENU_WARN_INFO, "0x%X: 0x%X -> 0x%X.", addr, old_value, val);
     
     /* was this patch overwritten by somebody else? */
-    if (!is_patch_still_applied(p))
+    if (!is_patch_still_applied(&patches_global[p]))
     {
         MENU_SET_WARNING(MENU_WARN_NOT_WORKING,
             "Patch %x overwritten (expected %x, got %x).",
@@ -235,7 +235,7 @@ static MENU_UPDATE_FUNC(patches_update)
             }
             SIMPLE_PATCH_MENU_ENTRY(i).shidden = 0;
             
-            if (!is_patch_still_applied(i))
+            if (!is_patch_still_applied(&patches_global[i]))
             {
                 snprintf(last_error, sizeof(last_error), 
                     "Patch %x overwritten (expected %x, current value %x).",

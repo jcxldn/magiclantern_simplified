@@ -247,10 +247,10 @@ write_to_ram:
     return E_PATCH_OK;
 }
 
-int is_patch_still_applied(int p)
+int is_patch_still_applied(struct patch *p)
 {
-    uint32_t current = read_value(patches_global[p].addr, patches_global[p].is_instruction);
-    uint32_t patched = patches_global[p].new_value;
+    uint32_t current = read_value(p->addr, p->is_instruction);
+    uint32_t patched = p->new_value;
     return (current == patched);
 }
 
@@ -468,17 +468,18 @@ int _unpatch_memory(uintptr_t _addr)
     // SJE FIXME this should check if addr
     // exists within the range of any patch.
     /* find the patch in our data structure */
-    int p = -1;
-    for (int i = 0; i < num_patches; i++)
+    struct patch *p = NULL;
+    int32_t i;
+    for (i = 0; i < num_patches; i++)
     {
         if (patches_global[i].addr == addr)
         {
-            p = i;
+            p = &(patches_global[i]);
             break;
         }
     }
 
-    if (p == -1)
+    if (p == NULL)
     { // patch not found
         goto end;
     }
@@ -496,9 +497,9 @@ int _unpatch_memory(uintptr_t _addr)
     if (!IS_ROM_PTR(addr))
 #endif
     {
-        struct patch patch = patches_global[p];
-        patch.old_value = patches_global[p].new_value;
-        patch.new_value = patches_global[p].old_value;
+        struct patch patch = patches_global[i];
+        patch.old_value = p->new_value;
+        patch.new_value = p->old_value;
 
         err = apply_patch(&patch);
         if (err)
@@ -506,14 +507,14 @@ int _unpatch_memory(uintptr_t _addr)
     }
 
     /* remove from our data structure (shift the other array items) */
-    for (int i = p + 1; i < num_patches; i++)
+    for (i = i + 1; i < num_patches; i++)
     {
         patches_global[i-1] = patches_global[i];
     }
     num_patches--;
 
     /* also look it up in the function hooks, and zero it out if found */
-    for (int i = 0; i < MAX_FUNCTION_HOOKS; i++)
+    for (i = 0; i < MAX_FUNCTION_HOOKS; i++)
     {
         if (function_hooks[i].addr == _addr)
         {
@@ -528,7 +529,7 @@ int _unpatch_memory(uintptr_t _addr)
         cache_lock();
         err = _reapply_cache_patches();
     }
-    else if (patches_global[p].is_instruction)
+    else if (p->is_instruction)
     {
         err = _sync_locked_caches(0);
     }
