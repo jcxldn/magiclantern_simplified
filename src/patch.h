@@ -25,6 +25,8 @@
 #ifndef _patch_h_
 #define _patch_h_
 
+#include <stdint.h>
+
 #define E_PATCH_OK 0
 #define E_PATCH_UNKNOWN_ERROR       0x1
 #define E_PATCH_ALREADY_PATCHED     0x2
@@ -96,11 +98,11 @@ typedef void (*patch_hook_function_cbr)(uint32_t *regs, uint32_t *stack, uint32_
 int patch_hook_function(uintptr_t addr, uint32_t orig_instr, patch_hook_function_cbr hook_function, const char *description);
 /* to undo, use unpatch_memory(addr) */
 
-/* cache sync helper */
-int _patch_sync_caches(int also_data);
-
 #if defined(CONFIG_MMU_REMAP)
 #include "patch_mmu.h"
 #endif // CONFIG_MMU_REMAP
+#if defined(CONFIG_DIGIC_45)
+#include "patch_cache.h"
+#endif
 
 #endif // _patch_h_

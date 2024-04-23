@@ -1,6 +1,9 @@
 #ifndef _patch_mmu_h_
 #define _patch_mmu_h_
 
+// Don't include this header file directly, instead include patch.h.
+// This header only has the parts required for patching via MMU.
+
 #if !defined(CONFIG_MMU_REMAP)
 #error "patch_mmu.h included but CONFIG_MMU_REMAP not defined, shouldn't happen"
 #endif
