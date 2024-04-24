@@ -35,11 +35,26 @@
 #define E_PATCH_CACHE_COLLISION     0x10
 #define E_PATCH_CACHE_ERROR         0x20
 #define E_PATCH_REG_NOT_FOUND       0x40
+#define E_PATCH_WRONG_CPU           0x80
+#define E_PATCH_NO_SGI_HANDLER      0x100
+#define E_PATCH_CPU1_SUSPEND_FAIL   0x200
+#define E_PATCH_MMU_NOT_INIT        0x400
+#define E_PATCH_BAD_MMU_PAGE        0x800
+#define E_PATCH_CANNOT_MALLOC       0x1000
+#define E_PATCH_MALFORMED           0x2000
 
 #define E_UNPATCH_OK                0
 #define E_UNPATCH_NOT_PATCHED       0x10000
 #define E_UNPATCH_OVERWRITTEN       0x20000
 #define E_UNPATCH_REG_NOT_FOUND     0x80000
+
+#undef PATCH_DEBUG
+
+#ifdef PATCH_DEBUG
+#define dbg_printf(fmt,...) { printf(fmt, ## __VA_ARGS__); }
+#else
+#define dbg_printf(fmt,...) {}
+#endif
 
 struct patch
 {
@@ -60,9 +75,23 @@ struct patch
                             // D78X do not and ignore this field.
 };
 
+// SJE TODO we're not restricted as much on number of patches
+// for MMU cams, we can completely replace all content in
+// multiple 64kB pages.  That said, we don't use anywhere near
+// 32 in practice, so it's fine for now.  We could still make
+// these limits more intelligent, probably by moving the "too much"
+// logic out of patch.c and into patch_cache.c and patch_mmu.c
+#define MAX_PATCHES 32
+#define MAX_FUNCTION_HOOKS 32
+
+extern int num_patches;
+extern struct patch patches_global[MAX_PATCHES];
+
 // Reads value at address, truncated according to alignment of addr.
 // E.g. reads from 0x1001 return only 1 byte.
 uint32_t read_value(uint8_t *addr, int is_instruction);
+
+int is_patch_still_applied(struct patch *patch);
 
 // Given an array of patch structs, and a count of elements in
 // said array, either apply all patches or none.

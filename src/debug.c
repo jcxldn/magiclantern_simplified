@@ -653,9 +653,23 @@ static void run_test()
     // log multishot stuff
 //    dm_set_store_level(0xa6, 2);
 //    dm_set_print_level(0xa6, 2);
+
+    uint8_t engage[] = "Engage!";
+    struct patch p =
+    {
+        // replace "High ISO speed NR" with "Engage!",
+        // as a low risk (non-code) test that MMU remapping works.
+        .addr = (uint8_t *)0xf0048842,
+        .old_values = (uint8_t *)0xf0048842,
+        .new_values = engage,
+        .size = sizeof(engage),
+        .description = "GO!"
+    };
+    int err = apply_patches(&p, 1);
+    DryosDebugMsg(0, 15, "patch err: 0x%x", err);
 #endif
 
-#if 1 && defined(CONFIG_200D)
+#if 0 && defined(CONFIG_200D)
     // attempt Mem2Mem EDMAC copy!
     DryosDebugMsg(0, 15, "Attempting EDMAC mem->mem copy");
 

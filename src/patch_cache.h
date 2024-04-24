@@ -21,23 +21,7 @@ union function_hook_code
     uint32_t code[16];
 };
 
-#define MAX_PATCHES 32
-#define MAX_FUNCTION_HOOKS 32
-
-extern int num_patches;
-extern struct patch patches_global[MAX_PATCHES];
-extern union function_hook_code function_hooks[MAX_FUNCTION_HOOKS];
-
 int apply_patch(struct patch *patch);
 int _sync_locked_caches(int also_data);
-int is_patch_still_applied(struct patch *patch);
-
-#undef PATCH_DEBUG
-
-#ifdef PATCH_DEBUG
-#define dbg_printf(fmt,...) { printf(fmt, ## __VA_ARGS__); }
-#else
-#define dbg_printf(fmt,...) {}
-#endif
 
 #endif // _patch_cache_h_

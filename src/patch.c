@@ -11,13 +11,18 @@
 #include "cache_hacks.h"
 #endif
 
-// Digic 678X can't do cache lockdown, which this patching system is based on.
-// Note that patch.c and cache.c both can provide sync_caches(), with patch.c
-// preserving cache hacks / cache patches through a sync.  We link against both files.
-// cache.c provides a weak symbol, so it will get used on D678X, but not D45.
-#ifdef CONFIG_DIGIC_45
+#if defined(CONFIG_MMU_REMAP) || defined(CONFIG_DIGIC_45)
+// both of these can patch.  So far, D6 cannot.
+
+// SJE FIXME - ensure that sync_caches() is a good version of the function
+// on D78X cams!  Supposedly was provided from cache.c and patch.c,
+// with one being weak.
 
 static char last_error[70];
+int num_patches = 0;
+
+/* at startup we don't have malloc, so we allocate these statically */
+struct patch patches_global[MAX_PATCHES] = {{0}};
 
 char *error_msg(int err)
 {
@@ -32,6 +37,13 @@ char *error_msg(int err)
     if (err & E_PATCH_CACHE_COLLISION)      STR_APPEND(msg, "CACHE_COLLISION,");
     if (err & E_PATCH_CACHE_ERROR)          STR_APPEND(msg, "CACHE_ERROR,");
     if (err & E_PATCH_REG_NOT_FOUND)        STR_APPEND(msg, "REG_NOT_FOUND,");
+    if (err & E_PATCH_WRONG_CPU)            STR_APPEND(msg, "WRONG_CPU,");
+    if (err & E_PATCH_NO_SGI_HANDLER)       STR_APPEND(msg, "NO_SGI_HANDLER,");
+    if (err & E_PATCH_CPU1_SUSPEND_FAIL)    STR_APPEND(msg, "CPU1_SUSPEND_FAIL,");
+    if (err & E_PATCH_MMU_NOT_INIT)         STR_APPEND(msg, "MMU_NOT_INIT,");
+    if (err & E_PATCH_BAD_MMU_PAGE)         STR_APPEND(msg, "E_PATCH_BAD_MMU_PAGE,");
+    if (err & E_PATCH_CANNOT_MALLOC)        STR_APPEND(msg, "E_PATCH_CANNOT_MALLOC,");
+    if (err & E_PATCH_MALFORMED)            STR_APPEND(msg, "E_PATCH_MALFORMED,");
 
     if (err & E_UNPATCH_NOT_PATCHED)        STR_APPEND(msg, "NOT_PATCHED,");
     if (err & E_UNPATCH_OVERWRITTEN)        STR_APPEND(msg, "OVERWRITTEN,");
@@ -42,6 +54,21 @@ char *error_msg(int err)
     if (len) msg[len-1] = 0;
     
     return msg;
+}
+
+int is_patch_still_applied(struct patch *p)
+{
+    uint32_t current = read_value(p->addr, p->is_instruction);
+    uint32_t patched = 0;
+    if (p->size > 4)
+    {
+        patched = *(uint32_t *)(p->new_values);
+    }
+    else
+    {
+        patched = p->new_value;
+    }
+    return (current == patched);
 }
 
 // Given an array of patch structs, and a count of elements in
@@ -64,13 +91,17 @@ int apply_patches(struct patch *patches, uint32_t count)
     {
         dbg_printf("patch_memory_work(%x)\n", patches[c].addr);
 
-        // In this transitional code, fail if any patches are an unexpected size.
-        // We don't handle that yet, though we will in the future.
+        // On non-MMU cams, we can only patch 4 bytes at a time
+        // (is this a real hw limitation, or just code?  I would
+        // have expected you can do more than 4 so long as it's
+        // within a given cache line)
+#if defined(CONFIG_DIGIC_45)
         if (patches[c].size != 4)
         {
             err = E_PATCH_UNKNOWN_ERROR;
             goto end;
         }
+#endif
 
         /* is this address already patched? refuse to patch it twice */
         for (int i = 0; i < num_patches; i++)
@@ -90,25 +121,63 @@ int apply_patches(struct patch *patches, uint32_t count)
         }
 
         /* fill metadata */
-        patches_global[num_patches].addr = patches[c].addr;
-        patches_global[num_patches].size = patches[c].size;
-        patches_global[num_patches].new_value = patches[c].new_value;
-        patches_global[num_patches].is_instruction = patches[c].is_instruction;
-        patches_global[num_patches].description = patches[c].description;
+        struct patch *new_patch = &patches_global[num_patches];
+        new_patch->addr = patches[c].addr;
+        new_patch->size = patches[c].size;
+        new_patch->is_instruction = patches[c].is_instruction;
+        new_patch->description = patches[c].description;
 
-        /* are we patching the right thing? */
-        uint32_t old = read_value(patches_global[num_patches].addr,
-                                  patches_global[num_patches].is_instruction);
-
-        /* safety check */
-        if (old != patches[c].old_value)
+        // different code if we're using pointers to data,
+        // or storing data direct in the unions
+        if (patches[c].size > 4)
         {
-            err = E_PATCH_OLD_VALUE_MISMATCH;
-            goto end;
-        }
+            if (patches[c].new_values == NULL
+                || patches[c].old_values == NULL)
+            {
+                err = E_PATCH_MALFORMED;
+                goto end;
+            }
 
-        /* save backup value */
-        patches_global[num_patches].old_value = old;
+            // this malloc can be freed in _unpatch_memory(), patch_mmu.c
+            new_patch->new_values = malloc(patches[c].size * 2);
+            if (new_patch->new_values == NULL)
+            {
+                err = E_PATCH_CANNOT_MALLOC;
+                goto end;
+            }
+            new_patch->old_values = new_patch->new_values + patches[c].size;
+
+            // check old values match pre-patch, current values,
+            // do not patch on mismatch
+            if (memcmp(patches[c].old_values,
+                       patches[c].addr,
+                       patches[c].size) != 0)
+            {
+                err = E_PATCH_OLD_VALUE_MISMATCH;
+                free(new_patch->new_values);
+                new_patch->new_values = NULL;
+                new_patch->old_values = NULL;
+                goto end;
+            }
+
+            memcpy(new_patch->old_values, patches[c].old_values, patches[c].size);
+            memcpy(new_patch->new_values, patches[c].new_values, patches[c].size);
+        }
+        else
+        {
+            new_patch->new_value = patches[c].new_value;
+
+            /* are we patching the right thing? */
+            uint32_t old = read_value(new_patch->addr,
+                                      new_patch->is_instruction);
+
+            if (old != patches[c].old_value)
+            {
+                err = E_PATCH_OLD_VALUE_MISMATCH;
+                goto end;
+            }
+            new_patch->old_value = old;
+        }
 
         /* checks done, backups saved, now patch */
         err = apply_patch(&(patches[c]));
@@ -173,6 +242,8 @@ static MENU_UPDATE_FUNC(patch_update)
     if (sep) *sep = 0;
     MENU_SET_RINFO("%s", short_desc);
 
+    // SJE FIXME: this is terrible UI and makes it look like all ROM patches have errored.
+    // Use a different symbol, or a different colour.
     /* ROM patches are considered invasive, display them with red icon */
     MENU_SET_ICON(IS_ROM_PTR(patches_global[p].addr) ? MNI_RECORD : MNI_ON, 0);
 
@@ -183,8 +254,16 @@ static MENU_UPDATE_FUNC(patch_update)
     MENU_SET_NAME("%s", name);
 
     int val = read_value(patches_global[p].addr, patches_global[p].is_instruction);
-    int old_value = patches_global[p].old_value;
-
+    int old_value = 0;
+    if (patches_global[p].size > 4)
+    {
+        // for long patches, just show the first word
+        old_value = *(uint32_t *)(patches_global[p].old_values);
+    }
+    else
+    {
+        old_value = patches_global[p].old_value;
+    }
     /* patch value: do we have enough space to print before and after? */
     if ((val & 0xFFFF0000) == 0 && (old_value & 0xFFFF0000) == 0)
     {
@@ -202,9 +281,20 @@ static MENU_UPDATE_FUNC(patch_update)
     /* was this patch overwritten by somebody else? */
     if (!is_patch_still_applied(&patches_global[p]))
     {
+        uint32_t new_value = 0;
+        if (patches_global[p].size > 4)
+        { // for long patches, just show the first word,
+          // which in theory can be the same - confusing, but this
+          // is just a diagnostic
+            new_value = *(uint32_t *)(patches_global[p].new_values);
+        }
+        else
+        {
+            new_value = patches_global[p].new_value;
+        }
         MENU_SET_WARNING(MENU_WARN_NOT_WORKING,
             "Patch %x overwritten (expected %x, got %x).",
-            patches_global[p].addr, patches_global[p].new_value,
+            patches_global[p].addr, new_value,
             read_value(patches_global[p].addr, patches_global[p].is_instruction)
         );
     }
@@ -237,9 +327,20 @@ static MENU_UPDATE_FUNC(patches_update)
             
             if (!is_patch_still_applied(&patches_global[i]))
             {
+                uint32_t new_value = 0;
+                if (patches_global[i].size > 4)
+                { // for long patches, just show the first word,
+                  // which in theory can be the same - confusing, but this
+                  // is just a diagnostic
+                    new_value = *(uint32_t *)(patches_global[i].new_values);
+                }
+                else
+                {
+                    new_value = patches_global[i].new_value;
+                }
                 snprintf(last_error, sizeof(last_error), 
                     "Patch %x overwritten (expected %x, current value %x).",
-                    patches_global[i].addr, patches_global[i].new_value,
+                    patches_global[i].addr, new_value,
                     read_value(patches_global[i].addr, patches_global[i].is_instruction)
                 );
                 puts(last_error);
@@ -348,4 +449,4 @@ static void patch_simple_init()
 
 INIT_FUNC("patch", patch_simple_init);
 
-#endif
+#endif // defined(CONFIG_MMU_REMAP) || defined(CONFIG_DIGIC_45)

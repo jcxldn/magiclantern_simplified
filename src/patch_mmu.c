@@ -39,7 +39,7 @@ extern int send_software_interrupt(uint32_t interrupt, uint32_t shifted_cpu_id);
 extern void *memcpy_dryos(void *dst, const void *src, uint32_t count);
 //extern void early_printf(char *fmt, ...);
 
-static int assign_64k_to_L2_table(struct region_patch *patch,
+static int assign_64k_to_L2_table(struct patch *patch,
                                   struct mmu_L2_page_info *L2_page)
 {
     // SJE TODO can / should we use a semaphore here?  I'm not sure we can
@@ -51,7 +51,7 @@ static int assign_64k_to_L2_table(struct region_patch *patch,
 
     // An L2 section is split into 64kB "large pages", of which there can be 16
     // in use.  Determine which of these wants to be used.
-    uint32_t i = patch->patch_addr & 0x000f0000;
+    uint32_t i = (uint32_t)patch->addr & 0x000f0000;
     i >>= 16;
     qprintf("L2 backing page index: 0x%08x\n", i);
 
@@ -64,9 +64,9 @@ static int assign_64k_to_L2_table(struct region_patch *patch,
             return -1;
 
         pages[i] = global_mmu_conf.phys_mem_pages + MMU_PAGE_SIZE * backing_page_index;
-        qprintf("Rom->Ram copy: 0x%08x, 0x%08x\n", pages[i], patch->patch_addr & 0xffff0000);
+        qprintf("Rom->Ram copy: 0x%08x, 0x%08x\n", (uint32_t)patch->addr & 0xffff0000, pages[i]);
         memcpy_dryos(pages[i],
-                     (uint8_t *)(patch->patch_addr & 0xffff0000),
+                     (uint8_t *)((uint32_t)patch->addr & 0xffff0000),
                      MMU_PAGE_SIZE);
         backing_page_index++;
     }
@@ -95,7 +95,7 @@ static int assign_64k_to_L2_table(struct region_patch *patch,
 // many patches for the pages, all are in use and the patch
 // doesn't share an address.  Or, that a patch spans a 64kB
 // boundary, this is not handled.
-static struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
+static struct mmu_L2_page_info *find_L2_for_patch(struct patch *patch,
                                                   struct mmu_L2_page_info *l2_pages,
                                                   uint32_t num_pages)
 {
@@ -105,7 +105,7 @@ static struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
         return NULL;
 
     // check our patch doesn't span two 64kB pages, this is unhandled (currently)
-    if (patch->patch_addr + patch->size > ((patch->patch_addr & 0xffff0000) + MMU_PAGE_SIZE))
+    if (patch->addr + patch->size > (uint8_t *)(((uint32_t)patch->addr & 0xffff0000) + MMU_PAGE_SIZE))
         return NULL;
 
     // loop backwards so we assign unused pages forwards,
@@ -116,7 +116,7 @@ static struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
     for(uint32_t i = num_pages; i != 0; i--)
     {
         l2_page = (l2_pages + i - 1);
-        if (l2_page->virt_page_mapped == (patch->patch_addr & 0xfff00000) &&
+        if (l2_page->virt_page_mapped == ((uint32_t)patch->addr & 0xfff00000) &&
             l2_page->in_use)
         {
             if (assign_64k_to_L2_table(patch, l2_page) == 0)
@@ -138,7 +138,7 @@ static struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
     // page was free, no matches found, use this page
     if (assign_64k_to_L2_table(patch, unused_page) == 0)
     {
-        unused_page->virt_page_mapped = patch->patch_addr & 0xfff00000;
+        unused_page->virt_page_mapped = (uint32_t)patch->addr & 0xfff00000;
         return unused_page;
     }
     return NULL; // could not assign 64k page, probably exhausted pool of pages
@@ -155,10 +155,10 @@ static struct mmu_L2_page_info *find_L2_for_patch(struct region_patch *patch,
 // NB this function doesn't update TTBR registers.
 // It does invalidate relevant cache entries.
 //
-// You shouldn't call this directly, instead use patch_memory(),
+// You shouldn't call this directly, instead use apply_patch(),
 // which handles sleep/wake of cpu1, and ensuring it also takes the patch.
 static int apply_data_patch(struct mmu_config *mmu_conf,
-                            struct region_patch *patch)
+                            struct patch *patch)
 {
     uint32_t rom_base_addr = ROMBASEADDR & 0xff000000;
     // get original rom and ram memory flags
@@ -168,9 +168,9 @@ static int apply_data_patch(struct mmu_config *mmu_conf,
     uint32_t flags_new = flags_rom & ~L2_LARGEPAGE_MEMTYPE_MASK;
     flags_new |= (flags_ram & L2_LARGEPAGE_MEMTYPE_MASK);
 
-    qprintf("patch->patch_addr: 0x%08x\n\n", (uint32_t)(patch->patch_addr));
+    qprintf("\npatch->addr: 0x%08x\n", (uint32_t)(patch->addr));
 
-    uint32_t aligned_patch_addr = patch->patch_addr & 0xffff0000;
+    uint32_t aligned_patch_addr = (uint32_t)patch->addr & 0xffff0000;
 
     // SJE TODO: check if the patch address is in RAM.
     // If so, we don't want to waste our limited remap memory
@@ -185,20 +185,20 @@ static int apply_data_patch(struct mmu_config *mmu_conf,
     if (target_page == NULL)
     {
         qprintf("Target page NULL: 0x%08x\n", patch);
-        return -1;
+        return E_PATCH_BAD_MMU_PAGE;
     }
 
     // add page to tables
     qprintf("Doing TT edit: 0x%08x\n", aligned_patch_addr);
     qprintf("Target L2: 0x%08x\n", target_page->L2_table);
 
-    qprintf("Splitting L1 for: 0x%08x\n", patch->patch_addr);
+    qprintf("Splitting L1 for: 0x%08x\n", patch->addr);
     // point containing L1 table entry to our L2
-    split_l1_supersection(patch->patch_addr, (uint32_t)mmu_conf->L1_table);
+    split_l1_supersection((uint32_t)patch->addr, (uint32_t)mmu_conf->L1_table);
     if (target_page->in_use == 0)
     { // this wipes the L2 table so we must only do it the first time
       // we map a page in this section
-        replace_section_with_l2_table(patch->patch_addr,
+        replace_section_with_l2_table((uint32_t)patch->addr,
                                       (uint32_t)mmu_conf->L1_table,
                                       (uint32_t)target_page->L2_table,
                                       flags_new);
@@ -206,7 +206,7 @@ static int apply_data_patch(struct mmu_config *mmu_conf,
     }
 
     // Remap ROM page in RAM
-    uint32_t i = patch->patch_addr & 0x000f0000;
+    uint32_t i = (uint32_t)patch->addr & 0x000f0000;
     i >>= 16;
     qprintf("Phys mem: 0x%08x\n", target_page->phys_mem[i]);
     replace_rom_page(aligned_patch_addr,
@@ -215,16 +215,26 @@ static int apply_data_patch(struct mmu_config *mmu_conf,
                      flags_new);
 
     // Edit patch region in RAM copy
-    memcpy_dryos(target_page->phys_mem[i] + (patch->patch_addr & 0xffff),
-                 patch->patch_content,
-                 patch->size);
+    if (patch->size > 4)
+    {
+        memcpy_dryos(target_page->phys_mem[i] + ((uint32_t)patch->addr & 0xffff),
+                     patch->new_values,
+                     patch->size);
+        qprintf("*patch->new_values: 0x%08x\n\n", *patch->new_values);
+    }
+    else
+    {
+        qprintf("target: 0x%x\n", (target_page->phys_mem[i] + ((uint32_t)patch->addr & 0xffff)));
+        *(uint32_t *)(target_page->phys_mem[i] + ((uint32_t)patch->addr & 0xffff)) = patch->new_value;
+        qprintf("patch->new_value: 0x%08x\n\n", patch->new_value);
+    }
 
     // sync caches over edited table region
     dcache_clean((uint32_t)target_page->L2_table, MMU_L2_TABLE_SIZE);
     dcache_clean_multicore((uint32_t)target_page->L2_table, MMU_L2_TABLE_SIZE);
 
     // ensure icache takes new code if relevant
-    icache_invalidate(patch->patch_addr, MMU_PAGE_SIZE);
+    icache_invalidate((uint32_t)patch->addr, MMU_PAGE_SIZE);
 
     dcache_clean((uint32_t)mmu_conf->L1_table, MMU_L1_TABLE_SIZE);
     dcache_clean_multicore((uint32_t)mmu_conf->L1_table, MMU_L1_TABLE_SIZE);
@@ -258,10 +268,10 @@ static int apply_code_patch(struct mmu_config *mmu_conf,
         hook[2] += 2;
 
     // create data patch to apply our hook
-    struct region_patch hook_patch = {
-        .patch_addr = patch->patch_addr,
-        .orig_content = NULL,
-        .patch_content = hook,
+    struct patch hook_patch = {
+        .addr = (uint8_t *)patch->patch_addr,
+        .old_values = (uint8_t *)patch->patch_addr,
+        .new_values = hook,
         .size = 8,
         .description = NULL
     };
@@ -538,8 +548,9 @@ static void init_mmu_globals(void)
 // applies compile-time specified patches from platform/XXD/include/platform/mmu_patches.h
 static int apply_platform_patches(void)
 {
-    // SJE FIXME these should use patch_memory() so that patch manager
-    // is aware of them
+    // SJE FIXME these should use apply_patch() so that patch manager
+    // is aware of them...  But there's another problem, num_patches
+    // isn't updated and currently lives at a higher level, in patch.c
 
     for (uint32_t i = 0; i != COUNT(mmu_data_patches); i++)
     {
@@ -618,6 +629,14 @@ static int init_remap_mmu(void)
             if (!mmu_globals_initialised)
                 return -1;
 
+            // Later on we use SGI to get cpu1 to take MMU table changes.
+            // This early on we don't, problems with DryOS not being fully init'd,
+            // but we can init the required ML parts here.
+            register_wake_handler();
+            if (sgi_wake_handler_index == 0)
+                return -3;
+            qprintf("Registered cpu1 wake handler\n");
+
             #if defined(CONFIG_ALLOCATE_MEMORY_POOL)
             // We must patch the Alloc Mem start constant,
             // or DryOS will clobber ML memory (which we're currently running from!)
@@ -627,29 +646,27 @@ static int init_remap_mmu(void)
             // We don't need to do this on cpu1, both cpus use the same AllocMem
             // pool which cpu0 inits.
             //
-            // We can't use patch_memory() because that uses
+            // We can't use apply_patch() because that uses
             // our SGI handler to get cpu1 to take the patch,
             // and that isn't installed this early.
             uint32_t new_AM_start = RESTARTSTART + ALLOC_MEM_STOLEN;
 
-            struct region_patch patch = { .patch_addr = PTR_ALLOC_MEM_START,
-                                          .orig_content = NULL,
-                                          .patch_content = (uint8_t *)&new_AM_start,
-                                          .size = 4,
-                                          .description = NULL };
-            int res = apply_data_patch(&global_mmu_conf, &patch);
-            qprintf("AM start patch res: %d\n", res);
+            struct patch patch = { .addr = (uint8_t *)PTR_ALLOC_MEM_START,
+                                   .old_value = *(uint32_t *)PTR_ALLOC_MEM_START,
+                                   .new_value = new_AM_start,
+                                   .size = 4,
+                                   .description = NULL };
+            apply_data_patch(&global_mmu_conf, &patch);
             #endif
 
             #ifdef CONFIG_INIT1_HIJACK
             uint32_t init1_task_wrapper_addr = (uint32_t)init1_task_wrapper | 0x1;
-            struct region_patch patch2 = { .patch_addr = PTR_INIT1_TASK,
-                                           .orig_content = NULL,
-                                           .patch_content = (uint8_t *)&init1_task_wrapper_addr,
-                                           .size = 4,
-                                           .description = NULL };
-            res = apply_data_patch(&global_mmu_conf, &patch2);
-            qprintf("init1 patch res: %d\n", res);
+            struct patch patch2 = { .addr = (uint8_t *)PTR_INIT1_TASK,
+                                    .old_value = *(uint32_t *)PTR_INIT1_TASK,
+                                    .new_value = init1_task_wrapper_addr,
+                                    .size = 4,
+                                    .description = NULL };
+            apply_data_patch(&global_mmu_conf, &patch2);
             #endif // CONFIG_INIT1_HIJACK
 
             // Perform any hard-coded patches in include/platform/mmu_patches.h
@@ -698,58 +715,41 @@ uint32_t read_value(uint8_t *addr, int is_instruction)
 {
     // On D45 this is more complicated (the name read_value() is quite deceptive!)
     // We keep this function to provide the same API
-    return *addr;
+    return *(uint32_t *)addr;
 }
 
 // You probably don't want to call this directly.
-// This is used by patch_memory() after it decides what kind
+// This is used by apply_patch() after it decides what kind
 // of memory is at the address, since on D78X we must use
 // different routes for RAM and ROM changes.
-static int patch_memory_rom(uintptr_t addr, // patched address (32 bits)
-                            uint32_t old_value, // old value before patching (if it differs, the patch will fail)
-                            uint32_t new_value,
-                            const char *description) // what does this patch do? example: "raw_rec: slowdown dialog timers"
-                                                     // note: you must provide storage for the description string
-                                                     // a string literal will do; a local variable where you sprintf will not work
+static int patch_memory_rom(struct patch *patch)
 {
     uint32_t cpu_id = get_cpu_id();
     if (cpu_id != 0)
-        return -1;
+        return E_PATCH_WRONG_CPU;
 
     if (sgi_wake_handler_index == 0)
-        return -2;
+        return E_PATCH_NO_SGI_HANDLER;
 
     if (!mmu_globals_initialised)
-        return -3;
+        return E_PATCH_MMU_NOT_INIT;
 
-    // SJE FIXME apply_data_patch() may modify MMU tables.  If they are accessed when in
-    // an inconsistent state, this can cause a halt due to bad MMU translation.
-    //
-    // For now, do the cpu1 suspend dance for every patch.  Later we expect to take
-    // patchsets, and apply_patchset() should do the dance once per set.
+    // SJE FIXME - move the suspend logic up to apply_patches()
+    // so we do it once per patchset.
 
     // cpu0 schedules cpu1 to cli + wfi
     task_create_ex("sleep_cpu", 0x1c, 0x400, suspend_cpu1_then_update_mmu, 0, 1);
 
     // cpu0 waits for task to be entered
     if (wait_for_cpu1_to_suspend(500) < 0)
-        return -4; // failed to suspend cpu1
+        return E_PATCH_CPU1_SUSPEND_FAIL;
 
     // cpu0 cli, update ttbrs, wake cpu1, sei
 
     uint32_t cpu_mmu_offset = MMU_L1_TABLE_SIZE - 0x100 + cpu_id * 0x80;
     uint32_t old_int = cli();
 
-    // Translate old ML patch format to MMU format.
-    // Note this will go out of scope when function ends,
-    // but apply_data_patch() should have copied all it needs.
-    // Horrible, but future patchset work will tidy this up.
-    struct region_patch patch = { .patch_addr = addr,
-                                  .orig_content = NULL,
-                                  .patch_content = (uint8_t *)&new_value,
-                                  .size = 4,
-                                  .description = description };
-    apply_data_patch(&global_mmu_conf, &patch);
+    int err = apply_data_patch(&global_mmu_conf, patch);
 
     // update TTBRs (this DryOS function also triggers TLBIALL)
     change_mmu_tables(global_mmu_conf.L1_table + cpu_mmu_offset,
@@ -766,38 +766,44 @@ static int patch_memory_rom(uintptr_t addr, // patched address (32 bits)
     // which does already flush cache selectively, so can probably re-use
     // that logic, but it also wants to run on cpu1.
     _sync_caches();
-    return 0;
+    return err;
 }
 
-static int patch_memory_ram(uintptr_t addr, // patched address (32 bits)
-                            uint32_t old_value, // old value before patching (if it differs, the patch will fail)
-                            uint32_t new_value,
-                            const char *description) // what does this patch do? example: "raw_rec: slowdown dialog timers"
-                                                     // note: you must provide storage for the description string
-                                                     // a string literal will do; a local variable where you sprintf will not work
+static int patch_memory_ram(struct patch *patch)
 {
     uint32_t cpu_id = get_cpu_id();
     if (cpu_id != 0)
-        return -1;
+        return E_PATCH_WRONG_CPU;
 
     if (sgi_wake_handler_index == 0)
-        return -2;
+        return E_PATCH_NO_SGI_HANDLER;
 
-    // For now, do the cpu1 suspend dance for every patch.  Later we expect to take
-    // patchsets, and apply_patchset() should do the dance once per set.
+    // SJE FIXME - move the suspend logic up to apply_patches()
+    // so we do it once per patchset.
 
     // cpu0 schedules cpu1 to cli + wfi
     task_create_ex("sleep_cpu", 0x1c, 0x400, suspend_cpu1, 0, 1);
 
     // cpu0 waits for task to be entered
     if (wait_for_cpu1_to_suspend(500) < 0)
-        return -4; // failed to suspend cpu1
+        return E_PATCH_CPU1_SUSPEND_FAIL;
 
     // cpu0 cli, patch ram, wake cpu1, sei
 
     uint32_t old_int = cli();
 
-    *(uint32_t *)addr = new_value;
+    if (patch->size > 4)
+    {
+        memcpy_dryos(patch->addr, patch->new_values, patch->size);
+    }
+    else
+    {
+        *(uint32_t *)(patch->addr) = patch->new_value;
+    }
+
+    dcache_clean((uint32_t)patch->addr, patch->size);
+    dcache_clean_multicore((uint32_t)patch->addr, patch->size);
+    icache_invalidate((uint32_t)patch->addr, patch->size);
 
     // cpu0 wakes cpu1, which will sei
     send_software_interrupt(sgi_wake_handler_index, 1 << 1);
@@ -806,30 +812,80 @@ static int patch_memory_ram(uintptr_t addr, // patched address (32 bits)
     // SJE TODO we could be more selective about the cache flush,
     // if so, take care to ensure cpu1 also updates
     _sync_caches();
-    return 0;
+    return E_PATCH_OK;
 }
 
-// simple data patch
-int patch_memory(uintptr_t addr, // patched address (32 bits)
-                 uint32_t old_value, // old value before patching (if it differs, the patch will fail)
-                 uint32_t new_value,
-                 const char *description) // what does this patch do? example: "raw_rec: slowdown dialog timers"
-                                          // note: you must provide storage for the description string
-                                          // a string literal will do; a local variable where you sprintf will not work
+int apply_patch(struct patch *patch)
 {
     // SJE FIXME we can probably do much better detection logic
     // by lightweight parsing MMU tables to get region status.
     // This would also allow us to detect and avoid patching device memory.
-    if (IS_ROM_PTR(addr))
-        return patch_memory_rom(addr, old_value, new_value, description);
+    if (IS_ROM_PTR((uint32_t)patch->addr))
+        return patch_memory_rom(patch);
     else
-        return patch_memory_ram(addr, old_value, new_value, description);
+        return patch_memory_ram(patch);
 }
 
-// undo the patching done by one of the above calls
-int unpatch_memory(uintptr_t addr)
+// Undo the patching done by one of the above calls.
+// Notably, for this MMU implementation, we never unmap
+// ROM pages that we've mapped to RAM.  All the unpatch
+// does is copy the old ROM bytes over the RAM version.
+int _unpatch_memory(uint32_t _addr)
 {
-    return 0; // SJE FIXME
+    uint8_t *addr = (uint8_t *)_addr;
+    int err = E_UNPATCH_OK;
+    uint32_t old_int = cli();
+
+    dbg_printf("unpatch_memory(%x)\n", addr);
+
+    // SJE FIXME this should check if addr
+    // exists within the range of any patch.
+    //
+    // search for patch
+    struct patch *p = NULL;
+    int32_t i;
+    for (i = 0; i < num_patches; i++)
+    {
+        if (patches_global[i].addr == addr)
+        {
+            p = &(patches_global[i]);
+            break;
+        }
+    }
+
+    if (p == NULL)
+    { // patch not found
+        goto end;
+    }
+
+    if (!is_patch_still_applied(p))
+    {
+        err = E_UNPATCH_OVERWRITTEN;
+        goto end;
+    }
+
+    if (p->size > 4)
+    {
+        memcpy(p->addr, p->old_values, p->size);
+        free(p->new_values);
+        p->new_values = NULL;
+        p->old_values = NULL;
+    }
+    else
+    {
+        *(uint32_t *)(p->addr) = p->old_value;
+    }
+
+    // remove from our data structure (shift the other array items)
+    for (i = i + 1; i < num_patches; i++)
+    {
+        patches_global[i-1] = patches_global[i];
+    }
+    num_patches--;
+
+end:
+    sei(old_int);
+    return err;
 }
 
 #endif // CONFIG_MMU_REMAP

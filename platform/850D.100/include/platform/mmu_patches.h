@@ -6,7 +6,7 @@
 #if CONFIG_FW_VERSION == 100 // ensure our hard-coded patch addresses are not broken
                              // by a FW upgrade
 
-struct region_patch mmu_data_patches[] =
+struct patch mmu_data_patches[] =
 {
 
 };

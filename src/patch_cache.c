@@ -14,12 +14,8 @@
 // just so I don't have to deal with the build system and
 // make linking optional
 
-int num_patches = 0;
-
-/* at startup we don't have malloc, so we allocate these statically */
-struct patch patches_global[MAX_PATCHES] = {{0}};
-union function_hook_code function_hooks[MAX_FUNCTION_HOOKS];
 static char last_error[70];
+union function_hook_code function_hooks[MAX_FUNCTION_HOOKS];
 
 /* lock or unlock the cache as needed */
 static void set_cache_lock_state(int lock)
@@ -245,13 +241,6 @@ write_to_ram:
     }
     
     return E_PATCH_OK;
-}
-
-int is_patch_still_applied(struct patch *p)
-{
-    uint32_t current = read_value(p->addr, p->is_instruction);
-    uint32_t patched = p->new_value;
-    return (current == patched);
 }
 
 static int reapply_cache_patch(int p)

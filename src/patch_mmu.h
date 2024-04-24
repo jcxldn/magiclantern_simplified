@@ -8,19 +8,6 @@
 #error "patch_mmu.h included but CONFIG_MMU_REMAP not defined, shouldn't happen"
 #endif
 
-struct region_patch
-{
-    uint32_t patch_addr; // Address of start of edited content; the VA to patch.
-                         // memcpy((void *)patch_addr, orig_content, size) would undo the patch,
-                         // but unpatch_region() should be used, not memcpy directly, so that
-                         // book-keeping of patches is handled correctly (and consistently
-                         // with existing patch.c functions).
-    uint8_t *orig_content; // Copy of original content, before patching.
-    const uint8_t *patch_content; // Patch data that will overwrite orig data.
-    uint32_t size; // Length of patched region in bytes.
-    const char *description; // What is the patch for?  Shows in ML menus.
-};
-
 struct function_hook_patch
 {
     uint32_t patch_addr; // VA to patch.
@@ -50,6 +37,8 @@ struct mmu_config
 
 extern struct mmu_config global_mmu_conf; // in patch_mmu.c
 extern void change_mmu_tables(uint8_t *ttbr0, uint8_t *ttbr1, uint32_t cpu_id);
+
+int apply_patch(struct patch *patch);
 
 // Sets up structures required for remapping via MMU,
 // and applies compile-time specified patches from platform/XXD/include/platform/mmu_patches.h
