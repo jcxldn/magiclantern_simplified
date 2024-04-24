@@ -77,12 +77,13 @@ void suspend_cpu1_then_update_mmu(void)
     uint32_t cpu_mmu_offset = MMU_L1_TABLE_SIZE - 0x100 + cpu_id * 0x80;
 
     qprintf("CPU1 sleeping");
-    uint32_t old_int = cli();
     cpu1_suspended = 1;
     while (sgi_wake_pending == 0)
     {
+        uint32_t old_int = cli();
         asm("dsb #0xf");
         asm("wfi");
+        sei(old_int);
     }
     qprintf("CPU1 awoke");
 
@@ -94,7 +95,6 @@ void suspend_cpu1_then_update_mmu(void)
     sgi_wake_pending = 0;
     cpu1_suspended = 0;
     asm("dsb #0xf");
-    sei(old_int);
 }
 #endif // CONFIG_DUAL_CORE && CONFIG_MMU_REMAP
 
