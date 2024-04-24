@@ -85,6 +85,7 @@ extern WEAK_FUNC(ret_0) int raw_hist_get_overexposure_percentage();
 extern WEAK_FUNC(ret_0) void raw_lv_request();
 extern WEAK_FUNC(ret_0) void raw_lv_release();
 extern WEAK_FUNC(ret_0) float raw_to_ev(int ev);
+extern WEAK_FUNC(ret_0) void mlv_set_type(mlv_hdr_t *, char *);
 
 int dual_iso_set_enabled(bool enabled);
 int dual_iso_is_enabled();
