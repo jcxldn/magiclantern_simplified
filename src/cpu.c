@@ -35,17 +35,17 @@ void suspend_cpu1(void)
     if (sgi_wake_handler_index == 0)
         return; // refuse to sleep cpu1 if there's no mechanism to wake it
 
-    uint32_t old_int = cli();
     cpu1_suspended = 1;
     while (sgi_wake_pending == 0)
     {
+        uint32_t old_int = cli();
         asm("dsb #0xf");
         asm("wfi");
+        sei(old_int);
     }
     sgi_wake_pending = 0;
     cpu1_suspended = 0;
     asm("dsb #0xf");
-    sei(old_int);
 }
 
 // Waits a maximum of "timeout" milliseconds for cpu1 to suspend.
