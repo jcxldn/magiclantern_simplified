@@ -5812,7 +5812,7 @@ shoot_task( void* unused )
 
     /* use a recursive lock for photo capture functions that may be called both from this task, or from other tasks */
     /* fixme: refactor and use semaphores, with thread safety annotations */
-    shoot_task_rlock = CreateRecursiveLock(1);
+    shoot_task_rlock = CreateRecursiveLock(NULL);
     AcquireRecursiveLock(shoot_task_rlock, 0);
 
     #ifdef FEATURE_MLU

@@ -90,7 +90,7 @@ task_create_ex(
 #endif
 
 extern void *AcquireRecursiveLock(void *lock, int n);
-extern void *CreateRecursiveLock(int n);
+extern void *CreateRecursiveLock(char *unk); // param is some kind of description of lock purpose
 extern void *ReleaseRecursiveLock(void *lock);
 
 struct semaphore {;} CAPABILITY("mutex");
