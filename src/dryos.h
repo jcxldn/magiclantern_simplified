@@ -89,7 +89,16 @@ task_create_ex(
 );
 #endif
 
-extern void *AcquireRecursiveLock(void *lock, int n);
+// This is a fairly normal recursive / re-entrant lock mechanism,
+// with tasks as the thread equivalent.
+//
+// That means:
+// One task can take the lock multiple times with no problems if it wants.
+// Other tasks can't take the lock until the first one releases it,
+// which requires one release per acquire.
+// If the first task exits before releasing all locks, they are not
+// freed by the exit; no other task can acquire it.
+extern void *AcquireRecursiveLock(void *lock, int n); // returns pointer, with low bits used for signalling?
 extern void *CreateRecursiveLock(char *unk); // param is some kind of description of lock purpose
 extern void *ReleaseRecursiveLock(void *lock);
 
