@@ -40,7 +40,13 @@ import optparse, re, sys, codecs, types
 
 from align_string_proportional import word_wrap
 from rbf_read import extent_func, rbf_init_font
-rbf_init_font("../../data/fonts/argnor23.rbf")
+# allow running from modules/some_module and
+# modules/some_category/some_module
+try:
+    rbf_init_font("../../data/fonts/argnor23.rbf")
+except FileNotFoundError:
+    rbf_init_font("../../../data/fonts/argnor23.rbf")
+
 wrap = lambda text, width: word_wrap(text, width, extent_func)
 
 # Use Unicode characters instead of their ascii psuedo-replacements

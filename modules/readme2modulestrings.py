@@ -3,11 +3,18 @@
 
 import sys, re
 import subprocess
+import os
 from datetime import datetime
 
 from align_string_proportional import word_wrap
 from rbf_read import extent_func, rbf_init_font
-rbf_init_font("../../data/fonts/argnor23.rbf")
+
+# allow running from modules/some_module and
+# modules/some_category/some_module
+try:
+    rbf_init_font("../../data/fonts/argnor23.rbf")
+except FileNotFoundError:
+    rbf_init_font("../../../data/fonts/argnor23.rbf")
 
 def run(cmd):
     try:
@@ -116,9 +123,19 @@ if "Summary" not in tags:
 rst2htmlCommands = ["rst2html", "rst2html5", "rst2html.py", "rst2html5.py"]
 rst2htmlCommand = get_command_of(rst2htmlCommands)
 
+# allow running from some_module/
+# or some_category/some_module/
+HTML2TEXT_PATH = "../html2text.py"
+if not os.path.isfile(HTML2TEXT_PATH):
+    HTML2TEXT_PATH = "../" + HTML2TEXT_PATH
+
+# SJE FIXME why are we shelling out to python when we're already using python?
+# This could all be replaced with native python code.
+#
 # render the RST as html -> txt without the metadata tags
 # sed command at end is because Windows inserts CR characters all over the place. Removing them should be benign on other platforms. 
-txt = run('cat README.rst | grep -v -E "^:([^:])+:.+$" | ' + rst2htmlCommand + ' | python3 ../html2text.py -b 700 | sed "s/\r$//"')
+txt = run('cat README.rst | grep -v -E "^:([^:])+:.+$" | ' + rst2htmlCommand
+          + ' | python3 ' + HTML2TEXT_PATH + ' -b 700 | sed "s/\r$//"')
 
 desc = ""
 last_str = "Description"
@@ -141,9 +158,14 @@ for p in txt.strip("\n").split("\n")[2:]:
 
 add_string(last_str, desc)
 
+# allow running from some_module/
+# or some_category/some_module/
+LAST_CHANGE_PATH = "../last_change_info.sh"
+if not os.path.isfile(LAST_CHANGE_PATH):
+    LAST_CHANGE_PATH = "../" + LAST_CHANGE_PATH
 # extract version info
 # (prints the latest changeset that affected this module)
-last_change_info = run("sh ../last_change_info.sh")
+last_change_info = run("sh " + LAST_CHANGE_PATH)
 
 if len(last_change_info):
     last_change_date, last_changeset, author, commit_msg = last_change_info.split("\n")

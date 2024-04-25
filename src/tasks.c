@@ -350,6 +350,11 @@ static void ml_shutdown()
 #endif
     ml_shutdown_requested = 1;
     
+    // trigger final write for logging, disk_write_task() in log.c
+    extern struct semaphore *log_disk_sem;
+    if (log_disk_sem != NULL)
+        give_semaphore(log_disk_sem);
+
     restore_af_button_assignment_at_shutdown();
 #ifdef FEATURE_GPS_TWEAKS
     gps_tweaks_shutdown_hook();

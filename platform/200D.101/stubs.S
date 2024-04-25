@@ -68,20 +68,48 @@ THUMB_FN(0xDF006E6D,  DryosDebugMsg)          /* lots of debug messages; format 
 
 /** DMA **/
 THUMB_FN(0xE01B3297,  dma_memcpy)
+//THUMB_FN(0xe013a97e,  dma_memcpy_using_chan) // allows specifying the channel to use
+
+/** EDMAC **/
+// EDmac is distinct from XDMAC, they are different controllers.
 //
-// The following are believed correct, though not yet tested.
-// They're left commented for now, because ML code needs these to build,
-// and we currently have safe dummy functions in function_overrides.c
+// The following are known to work to some degree, but not
+// extensively checked for expected behaviour, function sigs etc.
 //
-// Now we have real things found, we need to check func sigs are unchanged,
-// usage, etc.  Certainly things have changed.
+//THUMB_FN(0x35392, _StartEDmac) // call sig changed, use StartEDmac in function_overrides.c
+//THUMB_FN(0x35486, edmac_set_addr)
+//THUMB_FN(0x35506, edmac_set_size)
+//THUMB_FN(0x3649c, ConnectWriteEDmac)
+//THUMB_FN(0x364f0, ConnectReadEDmac)
+//THUMB_FN(0x3678e, RegisterEDmacCompleteCBR)
+THUMB_FN(0xe04b3739,  CreateResLockEntry) // via xrefs to a pointer to "ResInfo"
+THUMB_FN(0xe04b381c,  DeleteResLockEntry)
+THUMB_FN(0xe04b3920,  LockEngineResources)
+// Wrong, left for reference:
+//THUMB_FN(0xe04b3b59,  LockEngineResources) // Down a bit from CreateResLockEntry, start v similar but end is different.
+THUMB_FN(0xe04b39c0,  UnLockEngineResources)
+THUMB_FN(0x37b08, shamem_read) // nearly always inlined on 200D, so very few refs.  Can find via
+                               // "[MEM1DEV] Addr=%#x Data=%#x", haven't checked if this is reliable on other D7
+THUMB_FN(0xe00c0484,  mem_to_mem_edmac_copy)
+THUMB_FN(0xe032a86e, get_sensor_vsize) // old name: FPS_REGISTER_B
+THUMB_FN(0xe032a8c8, get_sensor_accumh) // old name: FPS_REGISTER_A
 //
-//THUMB_FN(0x35392, StartEDmac);
-//THUMB_FN(0x35486, edmac_set_addr);
-//THUMB_FN(0x35506, edmac_set_size);
-//THUMB_FN(0x3649c, ConnectWriteEDmac);
-//THUMB_FN(0x364f0, ConnectReadEDmac);
-//THUMB_FN(0x3678e, RegisterEDmacCompleteCBR);
+// These two must be called when you're done with a device or channel,
+// or the next code that tries to use them will hang the cam hard (or sometimes reboot it):
+//THUMB_FN(0x36594, edmac_release_device) // called after complete CBR returns, takes a device ID
+//THUMB_FN(0x367ca, edmac_release_channel) // called after complete CBR returns, takes a channel
+//THUMB_FN(0x35328, edmac_related_05) // important, not sure on purpose
+//THUMB_FN(0x359d0, edmac_set_dma_flags) // bad name?  Might be more like edmac_set_shamem_flags?
+//THUMB_FN(0xe004ae36, edmac_info_dump) // works, don't know how to interpret
+//THUMB_FN(0xe0334e94, lv_capdev_dump) // looks interesting but crashes, incl. in shell.
+//                                     // null ptr deref, clearly some other func should be called first to init
+//THUMB_FN(0xe044fe10, edmac_get_pwrmng_ID_from_channel) // gets device ID of some kind
+//THUMB_FN(0xe044fd9c, edmac_pwrmng_wake_devices_maybe) // do something (wake, probably?) to list of devices
+//                                                      // Often used by edmac code close to locking eng resources
+//THUMB_FN(0xe044fdd6, edmac_pwrmng_sleep_devices_maybe) // sleep, or maybe unlock?  Paired calls with the above.
+//THUMB_FN(0x35b56, edmac_conditional_set_dma_flags)
+//THUMB_FN(0x36552, edmac_related_28_cleanup_something)
+//THUMB_FN(0x36904, edmac_related_16_register_irq_something)
 
 /** Eventprocs (call by name) **/
 THUMB_FN(0xE04BDB8F,  call)                   /* many functions called by name (lv_start, lv_stop etc) */
@@ -276,8 +304,6 @@ THUMB_FN(0xdf00b67d,  CreateRecursiveLock) // via "KerRLock.c", CRL() calls a fu
 THUMB_FN(0xdf00b451,  AcquireRecursiveLock)
 THUMB_FN(0xdf00b51b,  ReleaseRecursiveLock)
 THUMB_FN(0xe04b1d75,  dialog_redraw) // Found via checking xrefs to "pDialog->pSignature == pcSignature"
-THUMB_FN(0xe04b3739,  CreateResLockEntry) // via xrefs to a pointer to "ResInfo"
-THUMB_FN(0xe04b3b59,  LockEngineResources) //  Down a bit from CreateResLockEntry, start v similar but end is different.
 THUMB_FN(0xe06217f1,  ErrForCamera_handler) // ERR70, ERR80 etc (DlgErrForCamera.c, AJ_DIALOG.HANDLER_DlgErrForCamera.c)
 
 THUMB_FN(0xdf00d365,  fsuDecodePartitionTable) // SJE FIXME wrong, see notes below.
@@ -382,8 +408,8 @@ DATA_PTR(    0x412c,  task_dispatch_hook)
 //NSTUB(    0x3960,  gui_timer_struct) // in GUI_Control_Post
 //NSTUB(    0x7674,  mvr_config)
 //NSTUB(0xC0220000,  camera_engine)
-//NSTUB(0xDEADBEEF,  ErrCardForLVApp_handler)
-NSTUB(0xe04d669e,  PlayMovieGuideApp_handler) // "StartPlayMovieGuideApp" string, address passed to CreateDialogBox
+THUMB_FN(0xe071a7e0,  ErrCardForLVApp_handler)
+THUMB_FN(0xe04d669e,  PlayMovieGuideApp_handler) // needed for CONFIG_QEMU
 DATA_PTR(    0xe731,  additional_version) // this gets written to in early code.  Pick a safe area!
 //NSTUB(0xFF8542C4,  PowerAudioOutput)
 //NSTUB(0xFF85460C,  SetAudioVolumeOut)
@@ -406,30 +432,30 @@ THUMB_FN(0xdf00325d,  task_trampoline)
 //NSTUB(0xFF968874,  mvrFixQScale)
 
 // Sockets
-THUMB_FN(0xe071d880,  socket_create);
-THUMB_FN(0xe071d8b8,  socket_bind);
-THUMB_FN(0xe071d8f2,  socket_connect);
-THUMB_FN(0xe071d92c,  socket_listen);
-THUMB_FN(0xe071db7a,  socket_shutdown);
-THUMB_FN(0xe071d960,  socket_accept);
-THUMB_FN(0xe071d99a,  socket_recv);
-THUMB_FN(0xe071d9d8,  socket_recvfrom);
-THUMB_FN(0xe071da20,  socket_send);
-THUMB_FN(0xe071da3a,  socket_sendto);
-THUMB_FN(0xe071da80,  socket_setsockopt);
-THUMB_FN(0xe071dac4,  socket_getsockopt);
-THUMB_FN(0xe0714a20,  socket_close_caller);
-THUMB_FN(0xe07321f4,  socket_convertfd);
-THUMB_FN(0xe0714b1c,  socket_select_caller); // not the actual select function as this needs the fd converted
+THUMB_FN(0xe071d880,  socket_create)
+THUMB_FN(0xe071d8b8,  socket_bind)
+THUMB_FN(0xe071d8f2,  socket_connect)
+THUMB_FN(0xe071d92c,  socket_listen)
+THUMB_FN(0xe071db7a,  socket_shutdown)
+THUMB_FN(0xe071d960,  socket_accept)
+THUMB_FN(0xe071d99a,  socket_recv)
+THUMB_FN(0xe071d9d8,  socket_recvfrom)
+THUMB_FN(0xe071da20,  socket_send)
+THUMB_FN(0xe071da3a,  socket_sendto)
+THUMB_FN(0xe071da80,  socket_setsockopt)
+THUMB_FN(0xe071dac4,  socket_getsockopt)
+THUMB_FN(0xe0714a20,  socket_close_caller)
+THUMB_FN(0xe07321f4,  socket_convertfd)
+THUMB_FN(0xe0714b1c,  socket_select_caller) // not the actual select function as this needs the fd converted
 
-THUMB_FN(0xe036d59c,  wlan_connect);
-THUMB_FN(0xe0715828, set_IP_address); // sets both client IP and gateway IP
-THUMB_FN(0xe07159e8, nif_setup); // initialises network interface, set_IP_address() fails if this hasn't been called,
-                                 // even if wlan_connect has already succeeded.  So I guess this is at a different layer.
-                                 // wlanipset calls this for us, but that doesn't set gateway IP.
+THUMB_FN(0xe036d59c,  wlan_connect)
+THUMB_FN(0xe0715828, set_IP_address) // sets both client IP and gateway IP
+THUMB_FN(0xe07159e8, nif_setup) // initialises network interface, set_IP_address() fails if this hasn't been called,
+                                // even if wlan_connect has already succeeded.  So I guess this is at a different layer.
+                                // wlanipset calls this for us, but that doesn't set gateway IP.
 
-THUMB_FN(0xe00c0484,  mem_to_mem_edmac_copy)
-//THUMB_FN(0xe04b39c0,  UnLockEngineResources)
+THUMB_FN(0xe032a86e, _get_fps_register_b)
+THUMB_FN(0xe032a8c8, _get_fps_register_a)
 
 // SJE couldn't find it, some other cameras don't have it, looks like
 // audio-common.c has a static array for that.
