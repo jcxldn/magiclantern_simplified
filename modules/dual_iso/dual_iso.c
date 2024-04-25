@@ -359,7 +359,7 @@ static int isoless_disable(uint32_t start_addr, int size, int count, uint32_t* b
     return 0;
 }
 
-static struct semaphore * isoless_sem = 0;
+static struct semaphore *isoless_sem = NULL;
 
 /* Photo mode: always enable */
 /* LiveView: only enable in movie mode */
@@ -373,11 +373,12 @@ static unsigned int isoless_refresh(unsigned int ctx)
     if (!job_state_ready_to_take_pic())
         return 0;
 
-    // SJE TODO gain better understanding of why modern digic cams,
-    // apparently including 1300D, fail to take the sem if 2nd param is 0.
-    // On prior cams, 0 works fine.  But there are other uses with 0 on D678
-    // that seem okay!  E.g. the menu sem.
-    take_semaphore(isoless_sem, 1);
+    if (isoless_sem == NULL)
+        return 0;
+    int err = take_semaphore(isoless_sem, 0);
+    if (err)
+        return 0; // this func is called by module_exec_cbr(),
+                  // we return 0 on error, to allow later cbrs to run
 
     static uint32_t backup_lv[20];
     static uint32_t backup_ph[20];
@@ -979,7 +980,7 @@ static void isoless_mlv_rec_cbr (uint32_t event, void *ctx, mlv_hdr_t *hdr)
 
 static unsigned int isoless_init()
 {
-    isoless_sem = create_named_semaphore("isoless_sem", 0);
+    isoless_sem = create_named_semaphore("isoless_sem", 1); // initially unlocked
 
     if (is_camera("5D3", "1.1.3") || is_camera("5D3", "1.2.3"))
     {
