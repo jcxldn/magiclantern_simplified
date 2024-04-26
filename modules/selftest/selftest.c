@@ -1083,7 +1083,7 @@ static void stub_test_dryos()
 
     // sem
     static struct semaphore * sem = 0;
-    TEST_FUNC_CHECK(sem = sem ? sem : create_named_semaphore("test", 1), != 0);
+    TEST_FUNC_CHECK(sem = sem ? sem : create_named_semaphore("test", SEM_CREATE_UNLOCKED), != 0);
     TEST_FUNC_CHECK(take_semaphore(sem, 500), == 0);
     TEST_FUNC_CHECK(take_semaphore(sem, 500), != 0);
     TEST_FUNC_CHECK(give_semaphore(sem), == 0);

@@ -1035,7 +1035,7 @@ struct memSuite * shoot_malloc_suite_contig(size_t size)
 /* should be called before any mallocs */
 void _mem_init()
 {
-    mem_sem = create_named_semaphore("mem_sem", 1);
+    mem_sem = create_named_semaphore("mem_sem", SEM_CREATE_UNLOCKED);
 
     for (int a = 0; a < COUNT(allocators); a++)
     {

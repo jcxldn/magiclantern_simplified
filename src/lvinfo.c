@@ -593,7 +593,7 @@ void lvinfo_display(int top, int bottom)
 
 static void lvinfo_init()
 {
-    lvinfo_sem = create_named_semaphore("lvinfo_sem", 1);
+    lvinfo_sem = create_named_semaphore("lvinfo_sem", SEM_CREATE_UNLOCKED);
 }
 
 INIT_FUNC("lvinfo", lvinfo_init);

@@ -79,8 +79,8 @@ int init_log(uint8_t *buf, uint32_t size, char *filename)
         buf_end = buf + size;
         buf_size = size;
 
-        log_mem_sem = create_named_semaphore("log_mem_sem", 1); // starts unlocked
-        log_disk_sem = create_named_semaphore("log_disk_sem", 0); // starts locked
+        log_mem_sem = create_named_semaphore("log_mem_sem", SEM_CREATE_UNLOCKED);
+        log_disk_sem = create_named_semaphore("log_disk_sem", SEM_CREATE_LOCKED);
 
         log_fp = FIO_CreateFile(filename);
 

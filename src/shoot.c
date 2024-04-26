@@ -6569,7 +6569,7 @@ TASK_CREATE( "shoot_task", shoot_task, 0, 0x1a, 0x2000 );
 
 static void shoot_init()
 {
-    set_maindial_sem = create_named_semaphore("set_maindial_sem", 1);
+    set_maindial_sem = create_named_semaphore("set_maindial_sem", SEM_CREATE_UNLOCKED);
 
     menu_add( "Shoot", shoot_menus, COUNT(shoot_menus) );
     menu_add( "Expo", expo_menus, COUNT(expo_menus) );

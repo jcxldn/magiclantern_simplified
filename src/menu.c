@@ -5476,10 +5476,10 @@ void
 menu_init( void )
 {
     menus = NULL;
-    menu_sem = create_named_semaphore( "menus", 1 );
-    gui_sem = create_named_semaphore( "gui", 0 );
+    menu_sem = create_named_semaphore("menus", SEM_CREATE_UNLOCKED);
+    gui_sem = create_named_semaphore("gui", SEM_CREATE_LOCKED);
     DryosDebugMsg(0, 15, "created gui_sem in menu_init()");
-    menu_redraw_sem = create_named_semaphore( "menu_r", 1);
+    menu_redraw_sem = create_named_semaphore("menu_r", SEM_CREATE_UNLOCKED);
 
     menu_find_by_name( "Audio",     ICON_ML_AUDIO   );
     menu_find_by_name( "Expo",      ICON_ML_EXPO    );

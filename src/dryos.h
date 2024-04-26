@@ -104,10 +104,13 @@ extern void *ReleaseRecursiveLock(void *lock);
 
 struct semaphore {;} CAPABILITY("mutex");
 
+#define SEM_CREATE_LOCKED 0
+#define SEM_CREATE_UNLOCKED 1
 extern struct semaphore *
 create_named_semaphore(
         const char *name,
         int starts_unlocked // 0 is initially locked, 1 unlocked.  Any other value is an error
+                            // Use SEM_CREATE_LOCKED and SEM_CREATE_UNLOCKED.
 );
 
 extern int

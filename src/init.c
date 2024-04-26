@@ -600,7 +600,7 @@ void boot_pre_init_task()
     // but that happens via tasks, which is later than we need
     // for early MMU remapping.
     #if defined(CONFIG_RPC)
-    RPC_sem = create_named_semaphore("RPC", 1);
+    RPC_sem = create_named_semaphore("RPC", SEM_CREATE_UNLOCKED);
     #endif
     #if defined(CONFIG_MMU_REMAP)
     if (mmu_init() < 0)

@@ -48,7 +48,7 @@ static struct semaphore * beep_sem = 0;
 
 static void debug_init_func()
 {
-    beep_sem = create_named_semaphore("beep_sem",1);
+    beep_sem = create_named_semaphore("beep_sem", SEM_CREATE_UNLOCKED);
 }
 INIT_FUNC("debug", debug_init_func);
 

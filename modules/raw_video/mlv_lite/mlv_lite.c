@@ -4317,7 +4317,7 @@ static unsigned int raw_rec_init()
 
     lossless_init();
 
-    settings_sem = create_named_semaphore(0, 1);
+    settings_sem = create_named_semaphore(NULL, SEM_CREATE_UNLOCKED);
 
     ASSERT(((uint32_t)task_create("compress_task", 0x0F, 0x1000, compress_task, (void*)0) & 1) == 0);
 

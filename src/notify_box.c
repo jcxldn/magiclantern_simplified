@@ -94,8 +94,8 @@ end:
 
 static void dlg_init()
 {
-    notify_box_show_sem = create_named_semaphore("nbox_show_sem", 0);
-    notify_box_main_sem = create_named_semaphore("nbox_done_sem", 1);
+    notify_box_show_sem = create_named_semaphore("nbox_show_sem", SEM_CREATE_LOCKED);
+    notify_box_main_sem = create_named_semaphore("nbox_done_sem", SEM_CREATE_UNLOCKED);
 }
 
 INIT_FUNC(__FILE__, dlg_init);

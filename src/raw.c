@@ -2736,7 +2736,7 @@ static struct menu_entry debug_menus[] = {
 
 static void raw_init()
 {
-    raw_sem = create_named_semaphore("raw_sem", 1);
+    raw_sem = create_named_semaphore("raw_sem", SEM_CREATE_UNLOCKED);
 
     #ifdef RAW_DEBUG_TYPE
     menu_add("Debug", debug_menus, COUNT(debug_menus));
