@@ -305,6 +305,8 @@ static void _dcache_clean_all(void) {
     #endif
 }
 
+// This attempts to do a multi-processor flush of both
+// icache and dcache
 static inline void _sync_caches()
 {
     /* Self-modifying code (from uncacheable memory) */

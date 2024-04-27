@@ -56,8 +56,8 @@ int wait_for_cpu1_to_suspend(int32_t timeout)
 {
     while(cpu1_suspended == 0 && timeout > 0)
     {
-        msleep(50);
-        timeout -= 50;
+        msleep(10);
+        timeout -= 10;
     }
     if (timeout < 0)
     {

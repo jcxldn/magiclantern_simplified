@@ -172,11 +172,9 @@ static int apply_data_patch(struct mmu_config *mmu_conf,
 
     uint32_t aligned_patch_addr = (uint32_t)patch->addr & 0xffff0000;
 
-    // SJE TODO: check if the patch address is in RAM.
-    // If so, we don't want to waste our limited remap memory
-    // and should edit it directly.  We still want to use patch manager
-    // APIs for this, so there's a unified interface.
-    // See IS_ROM_PTR() and usage in patch.c
+    // NB there is no check for whether address being patched is originally in ram.
+    // It's wasteful to use this routine to patch ram.
+    // If you use apply_patches(), it should only get to here if you're targeting rom.
 
     struct mmu_L2_page_info *target_page = find_L2_for_patch(patch,
                                                              mmu_conf->L2_tables,
@@ -826,6 +824,43 @@ int apply_patch(struct patch *patch)
         return patch_memory_ram(patch);
 }
 
+// Given a pointer, return a pointer to the physical mem
+// backing the VA of the pointer.
+// If NULL is returned, the VA is not remapped.
+//
+// Can be used to edit rom content after it's already been patched;
+// find the backing ram and change that.  Strongly advised not
+// to use this function directly, instead, use unpatch_memory(),
+// and then patch again.  This is efficient, no MMU table changes
+// occur, it's mostly memcpy() if the page is already remapped.
+// If you edit a remapped page outside of the normal patch system,
+// future patches or unpatches may trash your change.
+static uint8_t *find_phys_mem(uint32_t virtual_addr)
+{
+    uint32_t L2_aligned_virt_addr = virtual_addr & 0xfff00000;
+    struct mmu_L2_page_info *L2_table = NULL;
+    uint32_t i;
+    for(i = 0; i < global_mmu_conf.max_L2_tables; i++)
+    {
+        L2_table = &global_mmu_conf.L2_tables[i];
+        if (L2_table->virt_page_mapped == L2_aligned_virt_addr)
+            break;
+    }
+    if (L2_table == NULL)
+        return NULL;
+
+    // we now know that *some* addresses in the containing region
+    // are remapped, but not if the specific VA is
+
+    uint32_t low_half_virt_addr = virtual_addr & 0x0000ffff;
+    uint32_t page_index = virtual_addr & 0x000f0000;
+    page_index >>= 16;
+    if (L2_table->phys_mem[page_index] == NULL)
+        return NULL;
+
+    return L2_table->phys_mem[page_index] + low_half_virt_addr;
+}
+
 // Undo the patching done by one of the above calls.
 // Notably, for this MMU implementation, we never unmap
 // ROM pages that we've mapped to RAM.  All the unpatch
@@ -864,17 +899,30 @@ int _unpatch_memory(uint32_t _addr)
         goto end;
     }
 
+    // find backing ram addr for VA
+    uint8_t *phys_mem = find_phys_mem(_addr);
+    if (phys_mem == NULL)
+    {
+        // This addr is not patched.  Shouldn't happen, since
+        // to get here we have to find it in patches_global
+        err = E_UNPATCH_NOT_PATCHED;
+        goto end;
+    }
+
     if (p->size > 4)
     {
-        memcpy(p->addr, p->old_values, p->size);
+        memcpy(phys_mem, p->old_values, p->size);
         free(p->new_values);
         p->new_values = NULL;
         p->old_values = NULL;
     }
     else
     {
-        *(uint32_t *)(p->addr) = p->old_value;
+        *(uint32_t *)(phys_mem) = p->old_value;
     }
+    dcache_clean((uint32_t)phys_mem, p->size);
+    dcache_clean_multicore((uint32_t)phys_mem, p->size);
+    icache_invalidate((uint32_t)phys_mem, p->size);
 
     // remove from our data structure (shift the other array items)
     for (i = i + 1; i < num_patches; i++)

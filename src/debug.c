@@ -654,19 +654,24 @@ static void run_test()
 //    dm_set_store_level(0xa6, 2);
 //    dm_set_print_level(0xa6, 2);
 
-    uint8_t engage[] = "Engage!";
+    // patch rom, test it worked
+    uint8_t *old_engage = (uint8_t *)0xf0048842;
+    uint8_t new_engage[] = "Engage!";
     struct patch p =
     {
-        // replace "High ISO speed NR" with "Engage!",
-        // as a low risk (non-code) test that MMU remapping works.
-        .addr = (uint8_t *)0xf0048842,
-        .old_values = (uint8_t *)0xf0048842,
-        .new_values = engage,
-        .size = sizeof(engage),
+        .addr = old_engage,
+        .old_values = old_engage,
+        .new_values = new_engage,
+        .size = sizeof(new_engage),
         .description = "GO!"
     };
     int err = apply_patches(&p, 1);
-    DryosDebugMsg(0, 15, "patch err: 0x%x", err);
+    DryosDebugMsg(0, 15, "Patch err, rom: %d, %s", err, old_engage);
+
+    // unpatch, test it worked
+    err = unpatch_memory((uint32_t)p.addr);
+    DryosDebugMsg(0, 15, "Unpatch err, rom: %d, %s", err, old_engage);
+
 #endif
 
 #if 0 && defined(CONFIG_200D)
