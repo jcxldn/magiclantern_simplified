@@ -19,6 +19,7 @@
 // used for waking cpu1 after cpu0 suspends it, to make editing MMU safer.
 
 #include "sgi.h" // for sgi_wake_pending
+#include "dryos_rpc.h"
 
 // Used by cpu0, via request_RPC(), to force cpu1
 // to disable interrupts and wait, so cpu0 can do stuff
@@ -28,7 +29,7 @@
 //
 // Measurements on 200D show cpu0 can consistently use this to
 // have cpu1 wait and resume in <30 microseconds.
-void busy_wait_cpu1(void *_wait)
+static void busy_wait_cpu1(void *_wait)
 {
     // This disables interrupts and busy wait locks
     // cpu1.  Disallow calls from cpu0 to prevent hanging cam.
@@ -50,7 +51,7 @@ void busy_wait_cpu1(void *_wait)
 
 // Same as busy_wait_cpu1(), but triggers MMU table
 // update upon leaving the busy-wait loop.
-void busy_wait_cpu1_then_update_mmu(void *_wait)
+static void busy_wait_cpu1_then_update_mmu(void *_wait)
 {
     // This disables interrupts and busy wait locks
     // cpu1.  Disallow calls from cpu0 to prevent hanging cam.
@@ -74,6 +75,61 @@ void busy_wait_cpu1_then_update_mmu(void *_wait)
     wait->waiting = 0;
     asm("dsb 0xf");
     sei(old);
+}
+
+// Requests cpu1 to busy-wait, returns when it has.
+// Should be passed a pointer to struct initialised to 0.
+void wait_for_cpu1_busy_wait(struct busy_wait *wait)
+{
+    // don't allow waiting for yourself to wait...
+    if (get_cpu_id() == 1)
+        return;
+
+    struct RPC_args args =
+    {
+        .RPC_func = busy_wait_cpu1,
+        .RPC_arg = wait
+    };
+
+    request_RPC(&args);
+    while(wait->waiting == 0)
+    {
+        asm("dsb 0xf");
+    }
+}
+
+// Requests cpu1 to busy-wait in advance of MMU update,
+// returns when it has reached the wait.  MMU update happens after wake.
+// Should be passed a pointer to struct initialised to 0.
+void wait_for_cpu1_busy_wait_update_mmu(struct busy_wait *wait)
+{
+    // don't allow waiting for yourself to wait...
+    if (get_cpu_id() == 1)
+        return;
+
+    struct RPC_args args =
+    {
+        .RPC_func = busy_wait_cpu1_then_update_mmu,
+        .RPC_arg = wait
+    };
+
+    request_RPC(&args);
+    while(wait->waiting == 0)
+    {
+        asm("dsb 0xf");
+    }
+}
+
+// Must be passed pointer to same struct used
+// with earlier wait_for_cpu1_busy_wait() call
+void wake_cpu1_busy_wait(struct busy_wait *wait)
+{
+    wait->wake = 1;
+    while(wait->waiting != 0)
+    {
+        asm("dsb 0xf");
+    }
+    wait->wake = 0;
 }
 
 // It's expected this function is only called from cpu1,

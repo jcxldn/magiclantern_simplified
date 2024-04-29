@@ -726,26 +726,25 @@ static int patch_memory_rom(struct patch *patch)
     if (cpu_id != 0)
         return E_PATCH_WRONG_CPU;
 
-    if (sgi_wake_handler_index == 0)
-        return E_PATCH_NO_SGI_HANDLER;
-
     if (!mmu_globals_initialised)
         return E_PATCH_MMU_NOT_INIT;
 
     // SJE FIXME - move the suspend logic up to apply_patches()
     // so we do it once per patchset.
 
-    // cpu0 schedules cpu1 to cli + wfi
-    task_create_ex("sleep_cpu", 0x1c, 0x400, suspend_cpu1_then_update_mmu, 0, 1);
+    uint32_t old_int = cli();
 
-    // cpu0 waits for task to be entered
-    if (wait_for_cpu1_to_suspend(500) < 0)
-        return E_PATCH_CPU1_SUSPEND_FAIL;
+    // cpu0 waits for cpu1 to be in the wait loop
+    struct busy_wait wait =
+    {
+        .waiting = 0,
+        .wake = 0
+    };
+    wait_for_cpu1_busy_wait_update_mmu(&wait);
 
     // cpu0 cli, update ttbrs, wake cpu1, sei
 
     uint32_t cpu_mmu_offset = MMU_L1_TABLE_SIZE - 0x100 + cpu_id * 0x80;
-    uint32_t old_int = cli();
 
     int err = apply_data_patch(&global_mmu_conf, patch);
 
@@ -756,7 +755,7 @@ static int patch_memory_rom(struct patch *patch)
     qprintf("MMU tables updated");
 
     // cpu0 wakes cpu1, which updates ttbrs, sei
-    send_software_interrupt(sgi_wake_handler_index, 1 << 1);
+    wake_cpu1_busy_wait(&wait);
     sei(old_int);
 
     // SJE TODO we could be more selective about the cache flush,
@@ -773,22 +772,19 @@ static int patch_memory_ram(struct patch *patch)
     if (cpu_id != 0)
         return E_PATCH_WRONG_CPU;
 
-    if (sgi_wake_handler_index == 0)
-        return E_PATCH_NO_SGI_HANDLER;
-
     // SJE FIXME - move the suspend logic up to apply_patches()
     // so we do it once per patchset.
 
-    // cpu0 schedules cpu1 to cli + wfi
-    task_create_ex("sleep_cpu", 0x1c, 0x400, suspend_cpu1, 0, 1);
-
-    // cpu0 waits for task to be entered
-    if (wait_for_cpu1_to_suspend(500) < 0)
-        return E_PATCH_CPU1_SUSPEND_FAIL;
-
-    // cpu0 cli, patch ram, wake cpu1, sei
-
     uint32_t old_int = cli();
+    // cpu0 waits for cpu1 to be in the wait loop
+    struct busy_wait wait =
+    {
+        .waiting = 0,
+        .wake = 0
+    };
+    wait_for_cpu1_busy_wait(&wait);
+
+    // cpu0 patch ram, wake cpu1, sei
 
     if (patch->size > 4)
     {
@@ -803,8 +799,8 @@ static int patch_memory_ram(struct patch *patch)
     dcache_clean_multicore((uint32_t)patch->addr, patch->size);
     icache_invalidate((uint32_t)patch->addr, patch->size);
 
-    // cpu0 wakes cpu1, which will sei
-    send_software_interrupt(sgi_wake_handler_index, 1 << 1);
+    // cpu0 wakes cpu1
+    wake_cpu1_busy_wait(&wait);
     sei(old_int);
 
     // SJE TODO we could be more selective about the cache flush,
