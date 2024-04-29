@@ -20,7 +20,61 @@
 
 #include "sgi.h" // for sgi_wake_pending
 
-static int cpu1_suspended = 0;
+// Used by cpu0, via request_RPC(), to force cpu1
+// to disable interrupts and wait, so cpu0 can do stuff
+// where cpu1 might interfere or encounter inconsistent state.
+//
+// cpu0 is responsible for waking cpu1 when finished!
+//
+// Measurements on 200D show cpu0 can consistently use this to
+// have cpu1 wait and resume in <30 microseconds.
+void busy_wait_cpu1(void *_wait)
+{
+    // This disables interrupts and busy wait locks
+    // cpu1.  Disallow calls from cpu0 to prevent hanging cam.
+    if (get_cpu_id() != 1)
+        return;
+
+    struct busy_wait *wait = (struct busy_wait *)_wait;
+
+    uint32_t old = cli();
+    wait->waiting = 1;
+    while (wait->wake == 0)
+    {
+        asm("dsb 0xf");
+    }
+    wait->waiting = 0;
+    asm("dsb 0xf");
+    sei(old);
+}
+
+// Same as busy_wait_cpu1(), but triggers MMU table
+// update upon leaving the busy-wait loop.
+void busy_wait_cpu1_then_update_mmu(void *_wait)
+{
+    // This disables interrupts and busy wait locks
+    // cpu1.  Disallow calls from cpu0 to prevent hanging cam.
+    uint32_t cpu_id = get_cpu_id();
+    if (cpu_id != 1)
+        return;
+
+    uint32_t old = cli();
+    struct busy_wait *wait = (struct busy_wait *)_wait;
+    uint32_t cpu_mmu_offset = MMU_L1_TABLE_SIZE - 0x100 + cpu_id * 0x80;
+
+    wait->waiting = 1;
+    while (wait->wake == 0)
+    {
+        asm("dsb 0xf");
+    }
+    // update TTBRs (this DryOS function also triggers TLBIALL)
+    change_mmu_tables(global_mmu_conf.L1_table + cpu_mmu_offset,
+                      global_mmu_conf.L1_table,
+                      cpu_id);
+    wait->waiting = 0;
+    asm("dsb 0xf");
+    sei(old);
+}
 
 // It's expected this function is only called from cpu1,
 // presumably via task_create_ex(). The name is a little misleading,
@@ -28,6 +82,7 @@ static int cpu1_suspended = 0;
 //
 // If called from cpu0 it does nothing, as a safety measure
 // to avoid locking the main core.
+static int cpu1_suspended = 0;
 void suspend_cpu1(void)
 {
     if (get_cpu_id() != 1)
