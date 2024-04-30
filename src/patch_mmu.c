@@ -833,6 +833,11 @@ int apply_patch(struct patch *patch)
 // future patches or unpatches may trash your change.
 static uint8_t *find_phys_mem(uint32_t virtual_addr)
 {
+    if (!IS_ROM_PTR(virtual_addr))
+    { // RAM addresses don't get remapped
+        return (uint8_t *)virtual_addr;
+    }
+
     uint32_t L2_aligned_virt_addr = virtual_addr & 0xfff00000;
     struct mmu_L2_page_info *L2_table = NULL;
     uint32_t i;

@@ -246,9 +246,7 @@ static int dual_iso_enable(uint32_t start_addr, int size, int count, uint32_t* b
         // Might want splitting into D45 / D678 paths.
         if (is_200d)
         {
-            //patch_cmos_iso_values_200d(start_addr, size, count);
-            // patch the rom values too?
-            patch_cmos_iso_values_200d(0xe0aaa2fc, size, count);
+            patch_cmos_iso_values_200d(start_addr, size, count);
             return 0;
         }
 
@@ -361,13 +359,19 @@ static int dual_iso_disable(uint32_t start_addr, int size, int count, uint32_t* 
     }
 
     // undo our patches
-#if defined(CONFIG_MMU_REMAP)
-    // here we do one large patch, thus only one unpatch
-    unpatch_memory(start_addr);
-#else
-    for (int i = 0; i < count; i++)
-        unpatch_memory(start_addr + i * size);
-#endif
+    if (is_200d)
+    {
+        // This should be all CONFIG_MMU_REMAP cams but we don't currently
+        // have a nice way of detecting that.
+
+        //Here we do one large patch, thus only one unpatch
+        unpatch_memory(start_addr);
+    }
+    else
+    {
+        for (int i = 0; i < count; i++)
+            unpatch_memory(start_addr + i * size);
+    }
     
     if (is_7d) /* commit the changes on master */
     {
@@ -1230,13 +1234,12 @@ static unsigned int dual_iso_init()
     {
         is_200d = 1;
 
-        //PHOTO_CMOS_ISO_START = 0xe19819c0; // this is the ROM copy
-        PHOTO_CMOS_ISO_START = get_photo_cmos_iso_start_200d(); // this returns the RAM copy
+//        PHOTO_CMOS_ISO_START = get_photo_cmos_iso_start_200d(); // this returns the RAM copy
+        PHOTO_CMOS_ISO_START = 0xe0aaa2fc;
         PHOTO_CMOS_ISO_COUNT = 18; // Actually seems like 24, although that is higher than I can explain.
                                    // "backup" array hardcodes size at 20, but, we are not using it,
                                    // we hold the old values in the patch old_values field.
         PHOTO_CMOS_ISO_SIZE  = 36;
-        DryosDebugMsg(0, 15, " ==== addr: 0x%08x", PHOTO_CMOS_ISO_START);
 /*
         //PHOTO_CMOS_ISO_START = 0xe1984538; // this is the ROM copy
         PHOTO_CMOS_ISO_START = get_photo_cmos_iso_start_200d(); // this returns the RAM copy
