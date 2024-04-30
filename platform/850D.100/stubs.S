@@ -113,6 +113,20 @@ THUMB_FN(0xe070ad32,  CancelDateTimer)
 THUMB_FN(0xe01af0f0,  cli_spin_lock)          /* used in AllocateMemory/FreeMemory and others */
 THUMB_FN(0xe00f292c,  send_software_interrupt) // int 10 is used by DryOS to sleep/wake cpu.
                                                // Func writes to 0xc1001f00
+THUMB_FN(0xdf002c4a, _request_RPC) // allows CPU0 or CPU1 to pass a func pointer and param
+                                   // to the other for RPC.
+                                   // Passing a NULL func pointer, will suspend the other
+                                   // CPU until it becomes non-NULL.
+                                   // DryOS seems to use this to deliberately sleep a CPU
+                                   // in some exceptional cases (e.g. asserts).
+                                   //
+                                   // Don't call this directly, because if you do,
+                                   // and you forget to call clear_RPC_request(),
+                                   // the target CPU will repeatedly call the func pointer
+                                   // as fast as possible, forever.
+                                   // Instead use request_RPC().
+THUMB_FN(0xdf002c6a,  clear_RPC_request) // reset the request to prevent calling
+                                         // the function forever
 
 /** MPU communication **/
 THUMB_FN(0xe00c13f8,  mpu_send) // "InterCom::Siodriver.c"
