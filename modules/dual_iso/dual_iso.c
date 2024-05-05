@@ -260,7 +260,7 @@ static int dual_iso_enable(uint32_t start_addr, int size, int count, uint32_t* b
         // the variable table address directly.
 
         // We can't read values directly on ARMv5 due to unaligned read behaviour
-        // interacting with do_patch() / read_value() behaviour.
+        // interacting with apply_patches() / read_value() behaviour.
         for (int i = 0; i < count; i++)
             backup[i] = read_value((uint8_t *)(start_addr + size * i), 0);
 
