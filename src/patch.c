@@ -14,10 +14,6 @@
 #if defined(CONFIG_MMU_REMAP) || defined(CONFIG_DIGIC_45)
 // both of these can patch.  So far, D6 cannot.
 
-// SJE FIXME - ensure that sync_caches() is a good version of the function
-// on D78X cams!  Supposedly was provided from cache.c and patch.c,
-// with one being weak.
-
 static char last_error[70];
 int num_patches = 0;
 
@@ -198,6 +194,8 @@ int apply_patches(struct patch *patches, uint32_t count)
         {
 #if defined(CONFIG_DIGIC_45)
             err = _sync_locked_caches(0);
+#elif defined(CONFIG_DIGIC_78X)
+            _sync_caches();
 #endif
         }
 
