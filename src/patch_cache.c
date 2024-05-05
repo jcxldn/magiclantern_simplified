@@ -457,8 +457,6 @@ int _unpatch_memory(uintptr_t _addr)
 
     dbg_printf("unpatch_memory(%x)\n", addr);
 
-    // SJE FIXME this should check if addr
-    // exists within the range of any patch.
     /* find the patch in our data structure */
     struct patch *p = NULL;
     int32_t i;
