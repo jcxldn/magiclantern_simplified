@@ -404,10 +404,9 @@ static struct menu_entry patch_menu[] =
         .submenu_width = 710,
         .children =  (struct menu_entry[]) {
             // for i in range(128): print "            PATCH_ENTRY(%d)," % i
-// SJE FIXME this hard-codes 32, to match MAX_PATCHES,
-// where really it should use the same constant.
-// Except - MMU cams will be able to do many more patches if we want.
-// Simplest to leave it as 32, we have no need for more at this time.
+#if MAX_PATCHES != 32
+#error "Max patches constant changed, this menu probably needs updating"
+#endif
             PATCH_ENTRY(0),
             PATCH_ENTRY(1),
             PATCH_ENTRY(2),
