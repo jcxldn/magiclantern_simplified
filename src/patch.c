@@ -379,7 +379,7 @@ static MENU_UPDATE_FUNC(patches_update)
 // these cams have cache lockdown, D678X do not.
     else if (cache_locked())
     {
-        MENU_SET_ICON(MNI_RED_CIRCLE, 0);
+        MENU_SET_ICON(MNI_ORANGE_CIRCLE, 0);
         MENU_SET_WARNING(MENU_WARN_ADVICE, "Cache is locked down (not exactly clean).");
     }
 #endif
