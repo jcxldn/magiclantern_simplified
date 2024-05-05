@@ -44,6 +44,7 @@ char *error_msg(int err)
     if (err & E_PATCH_BAD_MMU_PAGE)         STR_APPEND(msg, "E_PATCH_BAD_MMU_PAGE,");
     if (err & E_PATCH_CANNOT_MALLOC)        STR_APPEND(msg, "E_PATCH_CANNOT_MALLOC,");
     if (err & E_PATCH_MALFORMED)            STR_APPEND(msg, "E_PATCH_MALFORMED,");
+    if (err & E_PATCH_TOO_SMALL)            STR_APPEND(msg, "E_PATCH_TOO_SMALL,");
 
     if (err & E_UNPATCH_NOT_PATCHED)        STR_APPEND(msg, "NOT_PATCHED,");
     if (err & E_UNPATCH_OVERWRITTEN)        STR_APPEND(msg, "OVERWRITTEN,");
@@ -89,19 +90,26 @@ int apply_patches(struct patch *patches, uint32_t count)
     uint32_t c = 0;
     for (; c < count; c++)
     {
-        dbg_printf("patch_memory_work(%x)\n", patches[c].addr);
+        dbg_printf("apply_patches(%x)\n", patches[c].addr);
 
         // On non-MMU cams, we can only patch 4 bytes at a time
         // (is this a real hw limitation, or just code?  I would
         // have expected you can do more than 4 so long as it's
         // within a given cache line)
+        //
+        // On MMU cams we could patch < 4 bytes, but it means
+        // we'd need a bunch of byte shifting code and I can't
+        // be bothered.  Caller should always be able to read
+        // old value and mask in what change they want.
 #if defined(CONFIG_DIGIC_45)
         if (patches[c].size != 4)
+#elif defined(CONFIG_DIGIC_78X)
+        if (patches[c].size < 4)
+#endif
         {
             err = E_PATCH_UNKNOWN_ERROR;
             goto end;
         }
-#endif
 
         /* is this address already patched? refuse to patch it twice */
         for (int i = 0; i < num_patches; i++)

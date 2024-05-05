@@ -185,6 +185,11 @@ static int apply_data_patch(struct mmu_config *mmu_conf,
         qprintf("Target page NULL: 0x%08x\n", patch);
         return E_PATCH_BAD_MMU_PAGE;
     }
+    if (patch->size < 4)
+    {
+        qprintf("Not applying patch, size < 4\n");
+        return E_PATCH_TOO_SMALL;
+    }
 
     // add page to tables
     qprintf("Doing TT edit: 0x%08x\n", aligned_patch_addr);
@@ -220,7 +225,7 @@ static int apply_data_patch(struct mmu_config *mmu_conf,
                      patch->size);
         qprintf("*patch->new_values: 0x%08x\n\n", *patch->new_values);
     }
-    else
+    else if (patch->size == 4)
     {
         qprintf("target: 0x%x\n", (target_page->phys_mem[i] + ((uint32_t)patch->addr & 0xffff)));
         *(uint32_t *)(target_page->phys_mem[i] + ((uint32_t)patch->addr & 0xffff)) = patch->new_value;
@@ -729,6 +734,9 @@ static int patch_memory_rom(struct patch *patch)
     if (!mmu_globals_initialised)
         return E_PATCH_MMU_NOT_INIT;
 
+    if (patch->size < 4)
+        return E_PATCH_TOO_SMALL;
+
     // SJE FIXME - move the suspend logic up to apply_patches()
     // so we do it once per patchset.
 
@@ -747,6 +755,11 @@ static int patch_memory_rom(struct patch *patch)
     uint32_t cpu_mmu_offset = MMU_L1_TABLE_SIZE - 0x100 + cpu_id * 0x80;
 
     int err = apply_data_patch(&global_mmu_conf, patch);
+    // NB even on err we don't return early here.
+    // CPU1 is going to update MMU tables, and we don't have a mechanism
+    // to stop it.  Therefore it's better to do the same here;
+    // apply_data_patch() should leave the tables sane, so it's better
+    // to have them consistent.
 
     // update TTBRs (this DryOS function also triggers TLBIALL)
     change_mmu_tables(global_mmu_conf.L1_table + cpu_mmu_offset,
@@ -774,6 +787,9 @@ static int patch_memory_ram(struct patch *patch)
 
     // SJE FIXME - move the suspend logic up to apply_patches()
     // so we do it once per patchset.
+
+    if (patch->size < 4)
+        return E_PATCH_TOO_SMALL;
 
     uint32_t old_int = cli();
     // cpu0 waits for cpu1 to be in the wait loop
@@ -917,9 +933,14 @@ int _unpatch_memory(uint32_t _addr)
         p->new_values = NULL;
         p->old_values = NULL;
     }
-    else
+    else if (p->size == 4)
     {
         *(uint32_t *)(phys_mem) = p->old_value;
+    }
+    else
+    {
+        // size < 4 shouldn't happen, patch system shouldn't allow these to be applied
+        err = E_PATCH_TOO_SMALL;
     }
     dcache_clean((uint32_t)phys_mem, p->size);
     dcache_clean_multicore((uint32_t)phys_mem, p->size);

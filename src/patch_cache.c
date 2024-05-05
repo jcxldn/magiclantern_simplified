@@ -155,7 +155,7 @@ read_from_ram:
     // will return an incorrect (or, at least, an incomplete) value
     // if an unaligned address is requested.
     //
-    // That means patch_memory() will fail if you supply an unaligned addr
+    // That means apply_patches() will fail if you supply an unaligned addr
     // as the target, with a value containing anything non-zero in the high half
     // of old_value param.
     switch ((uintptr_t)addr & 3)
@@ -183,6 +183,9 @@ int apply_patch(struct patch *patch)
 #ifdef CONFIG_QEMU
     goto write_to_ram;
 #endif
+
+    if (patch->size != 4)
+        return E_PATCH_MALFORMED;
 
     if (IS_ROM_PTR(patch->addr))
     {
@@ -470,6 +473,12 @@ int _unpatch_memory(uintptr_t _addr)
 
     if (p == NULL)
     { // patch not found
+        goto end;
+    }
+
+    if (p->size != 4)
+    {
+        err = E_PATCH_MALFORMED;
         goto end;
     }
 

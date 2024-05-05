@@ -42,6 +42,7 @@
 #define E_PATCH_BAD_MMU_PAGE        0x800
 #define E_PATCH_CANNOT_MALLOC       0x1000
 #define E_PATCH_MALFORMED           0x2000
+#define E_PATCH_TOO_SMALL           0x4000
 
 #define E_UNPATCH_OK                0
 #define E_UNPATCH_NOT_PATCHED       0x10000
