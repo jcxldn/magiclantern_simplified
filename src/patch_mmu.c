@@ -549,12 +549,11 @@ static void init_mmu_globals(void)
 }
 
 // applies compile-time specified patches from platform/XXD/include/platform/mmu_patches.h
+//
+// This doesn't use patch manager, meaning you both can't unpatch them,
+// and won't see them in Debug menu.
 static int apply_platform_patches(void)
 {
-    // SJE FIXME these should use apply_patch() so that patch manager
-    // is aware of them...  But there's another problem, num_patches
-    // isn't updated and currently lives at a higher level, in patch.c
-
     for (uint32_t i = 0; i != COUNT(mmu_data_patches); i++)
     {
         if (apply_data_patch(&global_mmu_conf, &mmu_data_patches[i]) < 0)
@@ -649,9 +648,10 @@ static int init_remap_mmu(void)
             // We don't need to do this on cpu1, both cpus use the same AllocMem
             // pool which cpu0 inits.
             //
-            // We can't use apply_patch() because that uses
-            // our SGI handler to get cpu1 to take the patch,
-            // and that isn't installed this early.
+            // I'm unsure if apply_patch() would work here, it requires
+            // DryOS to install SGI handler for interrupt 0xc,
+            // due to use of _request_RPC().  Haven't checked if that
+            // occurs this early.
             uint32_t new_AM_start = RESTARTSTART + ALLOC_MEM_STOLEN;
 
             struct patch patch = { .addr = (uint8_t *)PTR_ALLOC_MEM_START,
@@ -737,9 +737,6 @@ static int patch_memory_rom(struct patch *patch)
     if (patch->size < 4)
         return E_PATCH_TOO_SMALL;
 
-    // SJE FIXME - move the suspend logic up to apply_patches()
-    // so we do it once per patchset.
-
     uint32_t old_int = cli();
 
     // cpu0 waits for cpu1 to be in the wait loop
@@ -785,9 +782,6 @@ static int patch_memory_ram(struct patch *patch)
     if (cpu_id != 0)
         return E_PATCH_WRONG_CPU;
 
-    // SJE FIXME - move the suspend logic up to apply_patches()
-    // so we do it once per patchset.
-
     if (patch->size < 4)
         return E_PATCH_TOO_SMALL;
 
@@ -827,9 +821,6 @@ static int patch_memory_ram(struct patch *patch)
 
 int apply_patch(struct patch *patch)
 {
-    // SJE FIXME we can probably do much better detection logic
-    // by lightweight parsing MMU tables to get region status.
-    // This would also allow us to detect and avoid patching device memory.
     if (IS_ROM_PTR((uint32_t)patch->addr))
         return patch_memory_rom(patch);
     else
@@ -890,8 +881,13 @@ int _unpatch_memory(uint32_t _addr)
 
     dbg_printf("unpatch_memory(%x)\n", addr);
 
-    // SJE FIXME this should check if addr
-    // exists within the range of any patch.
+    // SJE TODO, should this check if addr
+    // exists within the range of any patch?
+    // This makes the function name more truthful,
+    // and would be analogous with how old code works.
+    // Old code did only check exact match on addr, but also
+    // only patched 4 bytes at a time and assumed aligned
+    // addresses.
     //
     // search for patch
     struct patch *p = NULL;
