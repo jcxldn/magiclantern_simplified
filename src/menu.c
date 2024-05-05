@@ -2192,28 +2192,37 @@ static void menu_draw_icon(int x, int y, int type, intptr_t arg, int warn)
 
     switch(type)
     {
-        case MNI_OFF: maru(x, y, color_off); return;
-        case MNI_ON: maru(x, y, color_on); return;
-        case MNI_DISABLE: batsu(x, y, color_dis); return;
-        case MNI_NEUTRAL: maru(x, y, 55); return;
-        case MNI_AUTO: slider(x, y, 0, 0, color_slider_fg, color_slider_bg); return;
-        case MNI_PERCENT: round_box_meter(x, y, arg, color_slider_fg, color_slider_bg); return;
-        case MNI_PERCENT_ALLOW_OFF: round_box_meter(x, y, arg, color_slider_off_fg, color_slider_bg); return;
-        case MNI_PERCENT_OFF: round_box_meter(x, y, arg, color_off, color_off); return;
+        case MNI_OFF:
+            maru(x, y, color_off); return;
+        case MNI_ON:  // MNI_GREEN_CIRCLE is same value
+            maru(x, y, color_on); return;
+        case MNI_DISABLE:
+            batsu(x, y, color_dis); return;
+        case MNI_NEUTRAL:
+            maru(x, y, 55); return;
+        case MNI_AUTO:
+            slider(x, y, 0, 0, color_slider_fg, color_slider_bg); return;
+        case MNI_PERCENT:
+            round_box_meter(x, y, arg, color_slider_fg, color_slider_bg); return;
+        case MNI_PERCENT_ALLOW_OFF:
+            round_box_meter(x, y, arg, color_slider_off_fg, color_slider_bg); return;
+        case MNI_PERCENT_OFF:
+            round_box_meter(x, y, arg, color_off, color_off); return;
         //~ case MNI_PERCENT_PM: clockmeter_pm(x, y, arg, color_slider_fg, color_slider_bg); return;
-        case MNI_ACTION: playicon(x, y, color_action); return;
+        case MNI_ACTION:
+            playicon(x, y, color_action); return;
         case MNI_DICE:
         {
             int i = arg & 0xFFFF;
             int N = arg >> 16;
-            slider(x, y, i, N, color_slider_fg, color_slider_bg); return;
+            slider(x, y, i, N, color_slider_fg, color_slider_bg);
+            return;
         }
 
         case MNI_DICE_OFF:
         {
             int i = arg & 0xFFFF;
             int N = arg >> 16;
-
             //~ maru(x, y, i ? color_on : color_off); return;
             
             //~ if (i == 0) dice_icon(x, y, i-1, N-1, 40, 40);
@@ -2222,7 +2231,6 @@ static void menu_draw_icon(int x, int y, int type, intptr_t arg, int warn)
                 slider(x, y, i-1, N-1, color_off, color_off);
             else
                 slider(x, y, i-1, N-1, color_slider_off_fg, color_slider_bg);
-
             return;
         }
         //~ case MNI_SIZE: //size_icon(x, y, arg & 0xFFFF, arg >> 16, color_slider_fg); return;
@@ -2238,11 +2246,16 @@ static void menu_draw_icon(int x, int y, int type, intptr_t arg, int warn)
             //~ else color_icon(x, y, (char *)arg); 
             //~ return;
         //~ }
-        case MNI_RECORD:
+        case MNI_RECORD: // MNI_RED_CIRCLE is same value
             maru(x, y, COLOR_RED);
             return;
+
+        case MNI_ORANGE_CIRCLE:
+            maru(x, y, COLOR_ORANGE);
+            return;
             
-        case MNI_SUBMENU: submenu_only_icon(x, y, arg ? color_on : color_off); return;
+        case MNI_SUBMENU:
+            submenu_only_icon(x, y, arg ? color_on : color_off); return;
     }
 #endif
 }

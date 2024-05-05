@@ -320,6 +320,7 @@ menu_init( void );
 #define MNI_NONE -1
 #define MNI_OFF -2
 #define MNI_ON 1
+#define MNI_GREEN_CIRCLE 1
 #define MNI_AUTO 2
 #define MNI_PERCENT 3
 #define MNI_PERCENT_OFF 4
@@ -328,11 +329,13 @@ menu_init( void );
 //~ #define MNI_SIZE 7
 //~ #define MNI_NAMED_COLOR 8
 #define MNI_RECORD 8
+#define MNI_RED_CIRCLE 8
 #define MNI_NEUTRAL 9
 #define MNI_DISABLE 10
 #define MNI_SUBMENU 11
 #define MNI_DICE_OFF 12
 #define MNI_PERCENT_ALLOW_OFF 13
+#define MNI_ORANGE_CIRCLE 14
 
 #define MNI_BOOL(x) ((x) ? MNI_ON : MNI_OFF)
 #define MNI_BOOL_AUTO(x) ((x) == 1 ? MNI_ON : (x) == 0 ? MNI_OFF : MNI_AUTO)

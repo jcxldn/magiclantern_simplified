@@ -248,10 +248,8 @@ static MENU_UPDATE_FUNC(patch_update)
     if (sep) *sep = 0;
     MENU_SET_RINFO("%s", short_desc);
 
-    // SJE FIXME: this is terrible UI and makes it look like all ROM patches have errored.
-    // Use a different symbol, or a different colour.
-    /* ROM patches are considered invasive, display them with red icon */
-    MENU_SET_ICON(IS_ROM_PTR(patches_global[p].addr) ? MNI_RECORD : MNI_ON, 0);
+    /* ROM patches are considered invasive, display them with orange icon */
+    MENU_SET_ICON(IS_ROM_PTR(patches_global[p].addr) ? MNI_ORANGE_CIRCLE : MNI_GREEN_CIRCLE, 0);
 
     char name[20];
     snprintf(name, sizeof(name), "%s: %X",
@@ -374,14 +372,14 @@ static MENU_UPDATE_FUNC(patches_update)
     
     if (last_error[0])
     {
-        MENU_SET_ICON(MNI_RECORD, 0); /* red dot */
+        MENU_SET_ICON(MNI_RED_CIRCLE, 0);
         MENU_SET_WARNING(MENU_WARN_ADVICE, last_error);
     }
 #if defined(CONFIG_DIGIC_45)
 // these cams have cache lockdown, D678X do not.
     else if (cache_locked())
     {
-        MENU_SET_ICON(MNI_RECORD, 0); /* red dot */
+        MENU_SET_ICON(MNI_RED_CIRCLE, 0);
         MENU_SET_WARNING(MENU_WARN_ADVICE, "Cache is locked down (not exactly clean).");
     }
 #endif
