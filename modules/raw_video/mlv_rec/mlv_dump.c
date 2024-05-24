@@ -32,7 +32,7 @@
 #include <assert.h>
 
 #define MODULE_STRINGS_PREFIX mlv_dump_strings
-#include "../module_strings_wrapper.h"
+#include "../../module_strings_wrapper.h"
 #include "module_strings.h"
 MODULE_STRINGS()
 #ifdef __WIN32
@@ -106,8 +106,8 @@ char *strdup(const char *s);
 #endif
 
 /* project includes */
-#include "../lv_rec/lv_rec.h"
-#include "../../src/raw.h"
+#include "../../lv_rec/lv_rec.h"
+#include "../../../src/raw.h"
 #include "mlv.h"
 #include "dng/dng.h"
 #include "wav.h"
