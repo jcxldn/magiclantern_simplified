@@ -783,10 +783,10 @@ int _srm_get_free_space()
 
 static void exmem_init()
 {
-    alloc_sem = create_named_semaphore(0,0);
-    free_sem = create_named_semaphore(0,0);
+    alloc_sem = create_named_semaphore(NULL, SEM_CREATE_LOCKED);
+    free_sem = create_named_semaphore(NULL, SEM_CREATE_LOCKED);
 #ifndef CONFIG_MEMORY_SRM_NOT_WORKING
-    srm_alloc_sem = create_named_semaphore(0,0);
+    srm_alloc_sem = create_named_semaphore(NULL, SEM_CREATE_LOCKED);
 #endif
 }
 

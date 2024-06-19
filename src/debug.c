@@ -48,7 +48,7 @@ static struct semaphore * beep_sem = 0;
 
 static void debug_init_func()
 {
-    beep_sem = create_named_semaphore("beep_sem",1);
+    beep_sem = create_named_semaphore("beep_sem", SEM_CREATE_UNLOCKED);
 }
 INIT_FUNC("debug", debug_init_func);
 
@@ -80,12 +80,16 @@ draw_prop_reset( void * priv )
 
 void _card_led_on()
 {
+#ifdef CARD_LED_ADDRESS
     *(volatile uint32_t*) (CARD_LED_ADDRESS) = (LEDON);
+#endif
 }
 
 void _card_led_off()
 {
+#ifdef CARD_LED_ADDRESS
     *(volatile uint32_t*) (CARD_LED_ADDRESS) = (LEDOFF);
+#endif
 }
 
 void info_led_on()
@@ -653,9 +657,28 @@ static void run_test()
     // log multishot stuff
 //    dm_set_store_level(0xa6, 2);
 //    dm_set_print_level(0xa6, 2);
+
+    // patch rom, test it worked
+    uint8_t *old_engage = (uint8_t *)0xf0048842;
+    uint8_t new_engage[] = "Engage!";
+    struct patch p =
+    {
+        .addr = old_engage,
+        .old_values = old_engage,
+        .new_values = new_engage,
+        .size = sizeof(new_engage),
+        .description = "GO!"
+    };
+    int err = apply_patches(&p, 1);
+    DryosDebugMsg(0, 15, "Patch err, rom: %d, %s", err, old_engage);
+
+    // unpatch, test it worked
+    err = unpatch_memory((uint32_t)p.addr);
+    DryosDebugMsg(0, 15, "Unpatch err, rom: %d, %s", err, old_engage);
+
 #endif
 
-#if 1 && defined(CONFIG_200D)
+#if 0 && defined(CONFIG_200D)
     // attempt Mem2Mem EDMAC copy!
     DryosDebugMsg(0, 15, "Attempting EDMAC mem->mem copy");
 
@@ -1061,7 +1084,7 @@ static void save_crash_log()
             build_user);
 
         int M = GetFreeMemForAllocateMemory();
-        int m = MALLOC_FREE_MEMORY;
+        int m = GetFreeMemForMalloc();
         my_fprintf(f,
             "Free Memory  : %dK + %dK\n",
             m/1024, M/1024

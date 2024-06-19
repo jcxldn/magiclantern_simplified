@@ -618,7 +618,7 @@ uint32_t raw_twk_render(void *raw_buffer, uint32_t xRes, uint32_t yRes, uint32_t
 
 static unsigned int raw_twk_init()
 {
-    edmac_write_done_sem = create_named_semaphore("edmac_write_done_sem", 0);
+    edmac_write_done_sem = create_named_semaphore("edmac_write_done_sem", SEM_CREATE_LOCKED);
     mlv_play_queue_raw_to_bpp16 = (struct msg_queue *) msg_queue_create("mlv_play_queue_raw_to_bpp16", 3);
     mlv_play_queue_bpp16_to_yuv = (struct msg_queue *) msg_queue_create("mlv_play_queue_bpp16_to_yuv", 3);
     task_create("bpp16_to_yuv_task", 0x15, 0x4000, bpp16_to_yuv_task, 0);

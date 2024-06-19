@@ -1261,7 +1261,6 @@ PROP_HANDLER( PROP_LENS_STATIC_DATA )
     ASSERT(len == sizeof(struct prop_lens_static_data));
 
     const struct prop_lens_static_data * _static = (void*) buf;
-
     strncpy( lens_info.name, _static->lens_name, sizeof(lens_info.name) );
     lens_info.name[sizeof(lens_info.name) - 1] = '\0'; //null terminate
 
@@ -2178,7 +2177,7 @@ crop_factor_menu_init()
 static void
 lens_init( void* unused )
 {
-    focus_done_sem = create_named_semaphore( "focus_sem", 1 );
+    focus_done_sem = create_named_semaphore("focus_sem", SEM_CREATE_UNLOCKED);
 #ifndef CONFIG_5DC
     menu_add("Movie Tweaks", lens_menus, COUNT(lens_menus));
 #endif

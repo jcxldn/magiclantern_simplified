@@ -1053,9 +1053,9 @@ void movie_tweak_menu_init()
 }
 static void movtweak_init()
 {
-    menu_add( "Movie", mov_menus, COUNT(mov_menus) );
+    menu_add("Movie", mov_menus, COUNT(mov_menus));
     #ifdef FEATURE_EXPO_OVERRIDE
-    bv_sem = create_named_semaphore( "bv", 1 );
+    bv_sem = create_named_semaphore("bv", SEM_CREATE_UNLOCKED);
     #endif
 }
 

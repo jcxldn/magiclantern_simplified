@@ -5812,7 +5812,7 @@ shoot_task( void* unused )
 
     /* use a recursive lock for photo capture functions that may be called both from this task, or from other tasks */
     /* fixme: refactor and use semaphores, with thread safety annotations */
-    shoot_task_rlock = CreateRecursiveLock(1);
+    shoot_task_rlock = CreateRecursiveLock(NULL);
     AcquireRecursiveLock(shoot_task_rlock, 0);
 
     #ifdef FEATURE_MLU
@@ -6569,7 +6569,7 @@ TASK_CREATE( "shoot_task", shoot_task, 0, 0x1a, 0x2000 );
 
 static void shoot_init()
 {
-    set_maindial_sem = create_named_semaphore("set_maindial_sem", 1);
+    set_maindial_sem = create_named_semaphore("set_maindial_sem", SEM_CREATE_UNLOCKED);
 
     menu_add( "Shoot", shoot_menus, COUNT(shoot_menus) );
     menu_add( "Expo", expo_menus, COUNT(expo_menus) );

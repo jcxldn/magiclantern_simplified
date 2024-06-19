@@ -72,10 +72,10 @@
 #include "../raw_video/mlv_rec/mlv.h"
 #include "../raw_video/mlv_rec/mlv_rec_interface.h"
 
-static CONFIG_INT("isoless.hdr", isoless_hdr, 0);
-static CONFIG_INT("isoless.iso", isoless_recovery_iso, 3);
-static CONFIG_INT("isoless.alt", isoless_alternate, 0);
-static CONFIG_INT("isoless.prefix", isoless_file_prefix, 0);
+static CONFIG_INT("dual_iso.hdr", dual_iso_hdr, 0);
+static CONFIG_INT("dual_iso.iso", dual_iso_recovery_iso, 3);
+static CONFIG_INT("dual_iso.alt", dual_iso_alternate, 0);
+static CONFIG_INT("dual_iso.prefix", dual_iso_file_prefix, 0);
 
 extern WEAK_FUNC(ret_0) int raw_lv_is_enabled();
 extern WEAK_FUNC(ret_0) int get_dxo_dynamic_range();
@@ -85,6 +85,7 @@ extern WEAK_FUNC(ret_0) int raw_hist_get_overexposure_percentage();
 extern WEAK_FUNC(ret_0) void raw_lv_request();
 extern WEAK_FUNC(ret_0) void raw_lv_release();
 extern WEAK_FUNC(ret_0) float raw_to_ev(int ev);
+extern WEAK_FUNC(ret_0) void mlv_set_type(mlv_hdr_t *, char *);
 
 int dual_iso_set_enabled(bool enabled);
 int dual_iso_is_enabled();
@@ -127,15 +128,15 @@ static uint32_t CMOS_EXPECTED_FLAG = 0;
 #define CTX_SHOOT_TASK 0
 #define CTX_SET_RECOVERY_ISO 1
 
-static int isoless_recovery_iso_index()
+static int dual_iso_recovery_iso_index()
 {
     /* CHOICES("-6 EV", "-5 EV", "-4 EV", "-3 EV", "-2 EV", "-1 EV", "+1 EV", "+2 EV", "+3 EV", "+4 EV", "+5 EV", "+6 EV", "100", "200", "400", "800", "1600", "3200", "6400", "12800") */
 
     int max_index = MAX(FRAME_CMOS_ISO_COUNT, PHOTO_CMOS_ISO_COUNT) - 1;
     
     /* absolute mode */
-    if (isoless_recovery_iso >= 0)
-        return COERCE(isoless_recovery_iso, 0, max_index);
+    if (dual_iso_recovery_iso >= 0)
+        return COERCE(dual_iso_recovery_iso, 0, max_index);
     
     /* relative mode */
 
@@ -143,7 +144,7 @@ static int isoless_recovery_iso_index()
     if (lens_info.raw_iso == 0)
         return 0;
     
-    int delta = isoless_recovery_iso < -6 ? isoless_recovery_iso + 6 : isoless_recovery_iso + 7;
+    int delta = dual_iso_recovery_iso < -6 ? dual_iso_recovery_iso + 6 : dual_iso_recovery_iso + 7;
     int canon_iso_index = (lens_info.iso_analog_raw - 72) / 8;
     return COERCE(canon_iso_index + delta, 0, max_index);
 }
@@ -167,7 +168,7 @@ int dual_iso_get_dr_improvement()
     if (!dual_iso_is_active())
         return 0;
     
-    int iso1 = 72 + isoless_recovery_iso_index() * 8;
+    int iso1 = 72 + dual_iso_recovery_iso_index() * 8;
     int iso2 = lens_info.iso_analog_raw/8*8;
     return dual_iso_calc_dr_improvement(iso1, iso2);
 }
@@ -183,23 +184,46 @@ static void bulk_cb(uint32_t *parm, uint32_t address, uint32_t length)
     *parm = 0;
 }
 
-static int patch_cmos_iso_values_200d(uint32_t start_addr, int size, int count, uint32_t *backup)
+static int patch_cmos_iso_values_200d(uint32_t start_addr, int item_size, int count)
 {
-    if (backup == NULL)
-        return -1;
+    uint32_t table_size = item_size * count;
+
+    // save an alloc by getting space for both at once
+    uint8_t *new_values = malloc(table_size * 2);
+    if (new_values == NULL)
+        return -2;
+    uint8_t *old_values = new_values + table_size;
+
+    memcpy(new_values, (uint8_t *)start_addr, table_size);
+    memcpy(old_values, (uint8_t *)start_addr, table_size);
 
     for (int i = 0; i < count; i++)
     {
-        uint32_t patch_value = 0x0b444000; // 0xRRR ABCD 0, middle 4 are ISO values, RRR is CMOS register
-        uint32_t patch_addr = start_addr + i * size;
-        if (((*(uint32_t *)patch_addr) & 0xfff00000) == 0x0b400000) // sanity check
-            patch_memory(patch_addr, backup[i], patch_value, "dual_iso: CMOS[0] gains");
+        // field is 0xRRR ABCD 0, middle 4 are ISO values, RRR is CMOS register
+        // It seems that "unusual" patterns aren't accepted, somehow.
+        // 4400 or 4040 both work.  4440 results in all lines appearing the same brightness.
+        // 6420 seems to make two bright, two dark.
+        // So, this is not fully understood.
+        if ((*(uint32_t *)(old_values + item_size * i) & 0xfff00000) == 0x0b400000) // sanity check
+            *(uint32_t *)(new_values + item_size * i) = 0x0b444000; // 100/1600
     }
+    struct patch patch =
+    {
+        .addr = (uint8_t *)(start_addr),
+        .old_values = old_values,
+        .new_values = new_values,
+        .size = table_size,
+        .description = "dual_iso: CMOS[0] gains",
+        .is_instruction = 0
+    };
+    // NB this won't apply patch if location is already patched
+    apply_patches(&patch, 1);
 
+    free(new_values);
     return 0;
 }
 
-static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* backup)
+static int dual_iso_enable(uint32_t start_addr, int size, int count, uint32_t* backup)
 {
         /* for 7D */
         int start_addr_0 = start_addr;
@@ -215,7 +239,17 @@ static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* ba
                 msleep(20);
             start_addr = (uint32_t) local_buf + 2; /* our numbers are aligned at 16 bits, but not at 32 */
         }
-        
+
+        // SJE FIXME this is rather ugly.  Can we use any of the sanity
+        // checks below?  Needs investigating.  Can we find appropriate
+        // CMOS_IS_BITS etc, or is the data format too different?
+        // Might want splitting into D45 / D678 paths.
+        if (is_200d)
+        {
+            patch_cmos_iso_values_200d(start_addr, size, count);
+            return 0;
+        }
+
         // Get original values, used for sanity testing the address points at
         // tables of CMOS / ADTG values.
         // On some cams, FRAME_CMOS_ISO_START is not a fixed address so this will
@@ -226,19 +260,9 @@ static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* ba
         // the variable table address directly.
 
         // We can't read values directly on ARMv5 due to unaligned read behaviour
-        // interacting with do_patch() / read_value() behaviour.
+        // interacting with apply_patches() / read_value() behaviour.
         for (int i = 0; i < count; i++)
-            backup[i] = read_value((uint32_t *)(start_addr + size * i), 0);
-
-        // SJE FIXME this is rather ugly.  Can we use any of the sanity
-        // checks below?  Needs investigating.  Can we find appropriate
-        // CMOS_IS_BITS etc, or is the data format too different?
-        // Might want splitting into D45 / D678 paths.
-        if (is_200d)
-        {
-            patch_cmos_iso_values_200d(start_addr, size, count, backup);
-            return 0;
-        }
+            backup[i] = read_value((uint8_t *)(start_addr + size * i), 0);
 
         /* sanity check first */
         int prev_iso = 0;
@@ -287,7 +311,7 @@ static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* ba
         for (int i = 0; i < count; i++)
         {
             // get the CMOS bits from our target ISO
-            cmos_bits = backup[COERCE(isoless_recovery_iso_index(), 0, count-1)] & cmos_bits_mask;
+            cmos_bits = backup[COERCE(dual_iso_recovery_iso_index(), 0, count-1)] & cmos_bits_mask;
 
             if (is_5d2) // enable the dual ISO flag
                 cmos_bits |= 1 << (CMOS_FLAG_BITS + CMOS_ISO_BITS + CMOS_ISO_BITS);
@@ -296,7 +320,18 @@ static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* ba
             patch_value = backup[i] & (~cmos_bits_mask);
 
             patch_value |= cmos_bits; // add the CMOS bits from our target ISO
-            patch_memory(start_addr + i * size, backup[i], patch_value, "dual_iso: CMOS[0] gains");
+            // SJE FIXME convert this to use an array of patches
+            // so we get a patchset
+            struct patch patch =
+            {
+                .addr = (uint8_t *)(start_addr + i * size),
+                .old_value = backup[i],
+                .new_value = patch_value,
+                .size = 4,
+                .description = "dual_iso: CMOS[0] gains",
+                .is_instruction = 1
+            };
+            apply_patches(&patch, 1);
         }
 
         if (is_7d) /* commit the changes on master */
@@ -310,7 +345,7 @@ static int isoless_enable(uint32_t start_addr, int size, int count, uint32_t* ba
         return 0;
 }
 
-static int isoless_disable(uint32_t start_addr, int size, int count, uint32_t* backup)
+static int dual_iso_disable(uint32_t start_addr, int size, int count, uint32_t* backup)
 {
     /* for 7D */
     int start_addr_0 = start_addr;
@@ -324,8 +359,19 @@ static int isoless_disable(uint32_t start_addr, int size, int count, uint32_t* b
     }
 
     // undo our patches
-    for (int i = 0; i < count; i++)
-        unpatch_memory(start_addr + i * size);
+    if (is_200d)
+    {
+        // This should be all CONFIG_MMU_REMAP cams but we don't currently
+        // have a nice way of detecting that.
+
+        //Here we do one large patch, thus only one unpatch
+        unpatch_memory(start_addr);
+    }
+    else
+    {
+        for (int i = 0; i < count; i++)
+            unpatch_memory(start_addr + i * size);
+    }
     
     if (is_7d) /* commit the changes on master */
     {
@@ -338,7 +384,7 @@ static int isoless_disable(uint32_t start_addr, int size, int count, uint32_t* b
     return 0;
 }
 
-static struct semaphore * isoless_sem = 0;
+static struct semaphore *dual_iso_sem = NULL;
 
 /* Photo mode: always enable */
 /* LiveView: only enable in movie mode */
@@ -347,17 +393,22 @@ static int enabled_lv = 0;
 static int enabled_ph = 0;
 
 /* thread safe */
-static unsigned int isoless_refresh(unsigned int ctx)
+static unsigned int dual_iso_refresh(unsigned int ctx)
 {
     if (!job_state_ready_to_take_pic())
         return 0;
 
-    // SJE TODO gain better understanding of why modern digic cams,
-    // apparently including 1300D, fail to take the sem if 2nd param is 0.
-    // On prior cams, 0 works fine.  But there are other uses with 0 on D678
-    // that seem okay!  E.g. the menu sem.
-    take_semaphore(isoless_sem, 1);
+    if (dual_iso_sem == NULL)
+        return 0;
+    int err = take_semaphore(dual_iso_sem, 0);
+    if (err)
+        return 0; // this func is called by module_exec_cbr(),
+                  // we return 0 on error, to allow later cbrs to run
 
+    // SJE FIXME - have these backup arrays become redundant with patchmgr?
+    // I believe so, patches store the old content at time of patch.
+    // dual_iso_disable() should be able to revert to pre-patch values
+    // and these arrays can be removed.
     static uint32_t backup_lv[20];
     static uint32_t backup_ph[20];
     int mv = is_movie_mode() ? 1 : 0;
@@ -369,33 +420,36 @@ static unsigned int isoless_refresh(unsigned int ctx)
     if (PHOTO_CMOS_ISO_COUNT > COUNT(backup_lv)) goto end;
     
     static int prev_sig = 0;
-    int sig = isoless_recovery_iso + (lvi << 16) + (raw_mv << 17) + (raw_ph << 18) + (isoless_hdr << 24) + (isoless_alternate << 25) + (isoless_file_prefix << 26) + get_shooting_card()->file_number * isoless_alternate + lens_info.raw_iso * 1234;
+    int sig = dual_iso_recovery_iso + (lvi << 16) + (raw_mv << 17) + (raw_ph << 18)
+            + (dual_iso_hdr << 24) + (dual_iso_alternate << 25) + (dual_iso_file_prefix << 26)
+            + get_shooting_card()->file_number * dual_iso_alternate + lens_info.raw_iso * 1234;
     int setting_changed = (sig != prev_sig);
     prev_sig = sig;
     
     if (enabled_lv && setting_changed)
     {
-        isoless_disable(FRAME_CMOS_ISO_START, FRAME_CMOS_ISO_SIZE, FRAME_CMOS_ISO_COUNT, backup_lv);
+        dual_iso_disable(FRAME_CMOS_ISO_START, FRAME_CMOS_ISO_SIZE, FRAME_CMOS_ISO_COUNT, backup_lv);
         enabled_lv = 0;
     }
     
     if (enabled_ph && setting_changed)
     {
-        isoless_disable(PHOTO_CMOS_ISO_START, PHOTO_CMOS_ISO_SIZE, PHOTO_CMOS_ISO_COUNT, backup_ph);
+        dual_iso_disable(PHOTO_CMOS_ISO_START, PHOTO_CMOS_ISO_SIZE, PHOTO_CMOS_ISO_COUNT, backup_ph);
         enabled_ph = 0;
     }
 
-    if (isoless_hdr && raw_ph && !enabled_ph && PHOTO_CMOS_ISO_START && ((get_shooting_card()->file_number % 2) || !isoless_alternate))
+    if (dual_iso_hdr && raw_ph && !enabled_ph && PHOTO_CMOS_ISO_START
+        && ((get_shooting_card()->file_number % 2) || !dual_iso_alternate))
     {
         enabled_ph = 1;
-        int err = isoless_enable(PHOTO_CMOS_ISO_START, PHOTO_CMOS_ISO_SIZE, PHOTO_CMOS_ISO_COUNT, backup_ph);
+        int err = dual_iso_enable(PHOTO_CMOS_ISO_START, PHOTO_CMOS_ISO_SIZE, PHOTO_CMOS_ISO_COUNT, backup_ph);
         if (err) { NotifyBox(10000, "ISOless PH err(%d)", err); enabled_ph = 0; }
     }
     
-    if (isoless_hdr && raw_mv && !enabled_lv && FRAME_CMOS_ISO_START)
+    if (dual_iso_hdr && raw_mv && !enabled_lv && FRAME_CMOS_ISO_START)
     {
         enabled_lv = 1;
-        int err = isoless_enable(FRAME_CMOS_ISO_START, FRAME_CMOS_ISO_SIZE, FRAME_CMOS_ISO_COUNT, backup_lv);
+        int err = dual_iso_enable(FRAME_CMOS_ISO_START, FRAME_CMOS_ISO_SIZE, FRAME_CMOS_ISO_COUNT, backup_lv);
         if (err) { NotifyBox(10000, "ISOless LV err(%d)", err); enabled_lv = 0; }
     }
 
@@ -406,11 +460,11 @@ static unsigned int isoless_refresh(unsigned int ctx)
          * so it will mis-label the pics */
         int file_prefix_needs_delay = (ctx == CTX_SHOOT_TASK && lens_info.job_state);
 
-        int iso1 = 72 + isoless_recovery_iso_index() * 8;
+        int iso1 = 72 + dual_iso_recovery_iso_index() * 8;
         int iso2 = lens_info.iso_analog_raw/8*8;
 
         static int prefix_key = 0;
-        if (isoless_file_prefix && enabled_ph && iso1 != iso2)
+        if (dual_iso_file_prefix && enabled_ph && iso1 != iso2)
         {
             if (!prefix_key)
             {
@@ -431,23 +485,23 @@ static unsigned int isoless_refresh(unsigned int ctx)
     }
 
 end:
-    give_semaphore(isoless_sem);
+    give_semaphore(dual_iso_sem);
     return 0;
 }
 
 int dual_iso_set_enabled(bool enabled)
 {
     if (enabled)
-        isoless_hdr = 1; 
+        dual_iso_hdr = 1; 
     else
-        isoless_hdr = 0;
+        dual_iso_hdr = 0;
 
     return 1; // module is loaded & responded != ret_0
 }
 
 int dual_iso_is_enabled()
 {
-    return isoless_hdr;
+    return dual_iso_hdr;
 }
 
 int dual_iso_is_active()
@@ -460,7 +514,7 @@ int dual_iso_get_recovery_iso()
     if (!dual_iso_is_active())
         return 0;
     
-    return 72 + isoless_recovery_iso_index() * 8;
+    return 72 + dual_iso_recovery_iso_index() * 8;
 }
 
 int dual_iso_set_recovery_iso(int iso)
@@ -469,19 +523,19 @@ int dual_iso_set_recovery_iso(int iso)
         return 0;
     
     int max_index = MAX(FRAME_CMOS_ISO_COUNT, PHOTO_CMOS_ISO_COUNT) - 1;
-    isoless_recovery_iso = COERCE((iso - 72)/8, 0, max_index);
+    dual_iso_recovery_iso = COERCE((iso - 72)/8, 0, max_index);
 
     /* apply the new settings right now */
-    isoless_refresh(CTX_SET_RECOVERY_ISO);
+    dual_iso_refresh(CTX_SET_RECOVERY_ISO);
     return 1;
 }
 
-static unsigned int isoless_playback_fix(unsigned int ctx)
+static unsigned int dual_iso_playback_fix(unsigned int ctx)
 {
     if (is_7d || is_1100d)
         return 0; /* seems to cause problems, figure out why */
     
-    if (!isoless_hdr) return 0;
+    if (!dual_iso_hdr) return 0;
     if (!is_play_or_qr_mode()) return 0;
     
     static int aux = INT_MIN;
@@ -578,9 +632,9 @@ static unsigned int isoless_playback_fix(unsigned int ctx)
     return 0;
 }
 
-static MENU_UPDATE_FUNC(isoless_check)
+static MENU_UPDATE_FUNC(dual_iso_check)
 {
-    int iso1 = 72 + isoless_recovery_iso_index() * 8;
+    int iso1 = 72 + dual_iso_recovery_iso_index() * 8;
     int iso2 = lens_info.iso_analog_raw/8*8;
     
     if (!iso2)
@@ -610,9 +664,9 @@ static MENU_UPDATE_FUNC(isoless_check)
         menu_set_warning_raw(entry, info);
 }
 
-static MENU_UPDATE_FUNC(isoless_dr_update)
+static MENU_UPDATE_FUNC(dual_iso_dr_update)
 {
-    isoless_check(entry, info);
+    dual_iso_check(entry, info);
     if (info->warning_level >= MENU_WARN_ADVICE)
     {
         MENU_SET_VALUE("N/A");
@@ -624,15 +678,15 @@ static MENU_UPDATE_FUNC(isoless_dr_update)
     MENU_SET_VALUE("%d.%d EV", dr_improvement/10, dr_improvement%10);
 }
 
-static MENU_UPDATE_FUNC(isoless_overlap_update)
+static MENU_UPDATE_FUNC(dual_iso_overlap_update)
 {
-    int iso1 = 72 + isoless_recovery_iso_index() * 8;
+    int iso1 = 72 + dual_iso_recovery_iso_index() * 8;
     int iso2 = (lens_info.iso_analog_raw)/8*8;
 
     int iso_hi = MAX(iso1, iso2);
     int iso_lo = MIN(iso1, iso2);
     
-    isoless_check(entry, info);
+    dual_iso_check(entry, info);
     if (info->warning_level >= MENU_WARN_ADVICE)
     {
         MENU_SET_VALUE("N/A");
@@ -646,17 +700,17 @@ static MENU_UPDATE_FUNC(isoless_overlap_update)
     MENU_SET_VALUE("%d.%d EV", overlap/10, overlap%10);
 }
 
-static MENU_UPDATE_FUNC(isoless_update)
+static MENU_UPDATE_FUNC(dual_iso_update)
 {
-    if (!isoless_hdr)
+    if (!dual_iso_hdr)
         return;
 
-    int iso1 = 72 + isoless_recovery_iso_index() * 8;
+    int iso1 = 72 + dual_iso_recovery_iso_index() * 8;
     int iso2 = (lens_info.iso_analog_raw)/8*8;
 
     MENU_SET_VALUE("%d/%d", raw2iso(iso2), raw2iso(iso1));
 
-    isoless_check(entry, info);
+    dual_iso_check(entry, info);
     if (info->warning_level >= MENU_WARN_ADVICE)
         return;
     
@@ -665,12 +719,12 @@ static MENU_UPDATE_FUNC(isoless_update)
     MENU_SET_RINFO("DR+%d.%d", dr_improvement/10, dr_improvement%10);
 }
 
-static struct menu_entry isoless_menu[] =
+static struct menu_entry dual_iso_menu[] =
 {
     {
         .name = "Dual ISO",
-        .priv = &isoless_hdr,
-        .update = isoless_update,
+        .priv = &dual_iso_hdr,
+        .update = dual_iso_update,
         .max = 1,
         .help  = "Alternate ISO for every 2 sensor scan lines.",
         .help2 = "With some clever post, you get less shadow noise (more DR).",
@@ -678,8 +732,8 @@ static struct menu_entry isoless_menu[] =
         .children =  (struct menu_entry[]) {
             {
                 .name = "Recovery ISO",
-                .priv = &isoless_recovery_iso,
-                .update = isoless_check,
+                .priv = &dual_iso_recovery_iso,
+                .update = dual_iso_check,
                 .min = -12,
                 .max = 6,
                 .unit = UNIT_ISO,
@@ -689,27 +743,27 @@ static struct menu_entry isoless_menu[] =
             },
             {
                 .name = "Dynamic range gained",
-                .update = isoless_dr_update,
+                .update = dual_iso_dr_update,
                 .icon_type = IT_ALWAYS_ON,
                 .help  = "[READ-ONLY] How much more DR you get with current settings",
                 .help2 = "(upper theoretical limit, estimated from DxO measurements)",
             },
             {
                 .name = "Midtone overlapping",
-                .update = isoless_overlap_update,
+                .update = dual_iso_overlap_update,
                 .icon_type = IT_ALWAYS_ON,
                 .help  = "[READ-ONLY] How much of midtones will get better resolution",
                 .help2 = "Highlights/shadows will be half res, with aliasing/moire.",
             },
             {
                 .name = "Alternate frames only",
-                .priv = &isoless_alternate,
+                .priv = &dual_iso_alternate,
                 .max = 1,
                 .help = "Shoot one image with the hack, one without.",
             },
             {
                 .name = "Custom file prefix",
-                .priv = &isoless_file_prefix,
+                .priv = &dual_iso_file_prefix,
                 .max = 1,
                 .choices = CHOICES("OFF", "DUAL (unreliable!)"),
                 .help  = "Change file prefix for dual ISO photos (e.g. DUAL0001.CR2).",
@@ -939,7 +993,7 @@ static uint32_t get_photo_cmos_iso_start_200d(void)
 }
 
 /* callback routine for mlv_rec to add a custom DISO block after recording started (which already was specified in mlv.h in definition phase) */
-static void isoless_mlv_rec_cbr (uint32_t event, void *ctx, mlv_hdr_t *hdr)
+static void dual_iso_mlv_rec_cbr (uint32_t event, void *ctx, mlv_hdr_t *hdr)
 {
     /* construct a free-able pointer to later pass it to mlv_rec_queue_block */
     mlv_diso_hdr_t *dual_iso_block = malloc(sizeof(mlv_diso_hdr_t));
@@ -950,15 +1004,15 @@ static void isoless_mlv_rec_cbr (uint32_t event, void *ctx, mlv_hdr_t *hdr)
     
     /* and fill with data */
     dual_iso_block->dualMode = dual_iso_is_active();
-    dual_iso_block->isoValue = isoless_recovery_iso;
+    dual_iso_block->isoValue = dual_iso_recovery_iso;
     
     /* finally pass it to mlv_rec which will free the block when it has been processed */
     mlv_rec_queue_block((mlv_hdr_t *)dual_iso_block);
 }
 
-static unsigned int isoless_init()
+static unsigned int dual_iso_init()
 {
-    isoless_sem = create_named_semaphore("isoless_sem", 0);
+    dual_iso_sem = create_named_semaphore("dual_iso_sem", SEM_CREATE_UNLOCKED);
 
     if (is_camera("5D3", "1.1.3") || is_camera("5D3", "1.2.3"))
     {
@@ -1180,12 +1234,12 @@ static unsigned int isoless_init()
     {
         is_200d = 1;
 
-        //PHOTO_CMOS_ISO_START = 0xe19819c0; // this is the ROM copy
-        PHOTO_CMOS_ISO_START = get_photo_cmos_iso_start_200d(); // this returns the RAM copy
+//        PHOTO_CMOS_ISO_START = get_photo_cmos_iso_start_200d(); // this returns the RAM copy
+        PHOTO_CMOS_ISO_START = 0xe0aaa2fc;
         PHOTO_CMOS_ISO_COUNT = 18; // Actually seems like 24, although that is higher than I can explain.
-                                   // Other dual-iso code hardcodes some arrays at size 20 so I limit here.
+                                   // "backup" array hardcodes size at 20, but, we are not using it,
+                                   // we hold the old values in the patch old_values field.
         PHOTO_CMOS_ISO_SIZE  = 36;
-        DryosDebugMsg(0, 15, " ==== addr: 0x%08x", PHOTO_CMOS_ISO_START);
 /*
         //PHOTO_CMOS_ISO_START = 0xe1984538; // this is the ROM copy
         PHOTO_CMOS_ISO_START = get_photo_cmos_iso_start_200d(); // this returns the RAM copy
@@ -1295,37 +1349,37 @@ static unsigned int isoless_init()
 
     if (FRAME_CMOS_ISO_START || PHOTO_CMOS_ISO_START)
     {
-        menu_add("Expo", isoless_menu, COUNT(isoless_menu));
+        menu_add("Expo", dual_iso_menu, COUNT(dual_iso_menu));
     }
     else
     {
-        isoless_hdr = 0;
+        dual_iso_hdr = 0;
         return 1;
     }
     
-    mlv_rec_register_cbr(MLV_REC_EVENT_PREPARING, &isoless_mlv_rec_cbr, NULL);
+    mlv_rec_register_cbr(MLV_REC_EVENT_PREPARING, &dual_iso_mlv_rec_cbr, NULL);
     
     return 0;
 }
 
-static unsigned int isoless_deinit()
+static unsigned int dual_iso_deinit()
 {
     return 0;
 }
 
 MODULE_INFO_START()
-    MODULE_INIT(isoless_init)
-    MODULE_DEINIT(isoless_deinit)
+    MODULE_INIT(dual_iso_init)
+    MODULE_DEINIT(dual_iso_deinit)
 MODULE_INFO_END()
 
 MODULE_CBRS_START()
-    MODULE_CBR(CBR_SHOOT_TASK, isoless_refresh, CTX_SHOOT_TASK)
-    MODULE_CBR(CBR_SHOOT_TASK, isoless_playback_fix, CTX_SHOOT_TASK)
+    MODULE_CBR(CBR_SHOOT_TASK, dual_iso_refresh, CTX_SHOOT_TASK)
+    MODULE_CBR(CBR_SHOOT_TASK, dual_iso_playback_fix, CTX_SHOOT_TASK)
 MODULE_CBRS_END()
 
 MODULE_CONFIGS_START()
-    MODULE_CONFIG(isoless_hdr)
-    MODULE_CONFIG(isoless_recovery_iso)
-    MODULE_CONFIG(isoless_alternate)
-    MODULE_CONFIG(isoless_file_prefix)
+    MODULE_CONFIG(dual_iso_hdr)
+    MODULE_CONFIG(dual_iso_recovery_iso)
+    MODULE_CONFIG(dual_iso_alternate)
+    MODULE_CONFIG(dual_iso_file_prefix)
 MODULE_CONFIGS_END()

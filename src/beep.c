@@ -1123,8 +1123,8 @@ static void beep_init()
     rootq->multiplex=100;
 #endif
 
-    beep_sem = create_named_semaphore( "beep_sem", 0 );
-    menu_add( "Audio", beep_menus, COUNT(beep_menus) );
+    beep_sem = create_named_semaphore("beep_sem", SEM_CREATE_LOCKED);
+    menu_add("Audio", beep_menus, COUNT(beep_menus));
 
 #ifdef FEATURE_WAV_RECORDING
     find_next_wav(0,1);

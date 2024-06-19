@@ -47,6 +47,7 @@ FLAGS=\
 	-fomit-frame-pointer \
 	-fno-strict-aliasing \
 	-fno-zero-initialized-in-bss \
+	-fno-extended-identifiers \
 	-I$(TOP_DIR)/include
 
 TARGET_COMPILER ?= arm-gcc

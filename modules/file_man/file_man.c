@@ -1252,8 +1252,8 @@ static int InitRootDir()
 
 static unsigned int fileman_init()
 {
-    scandir_sem = create_named_semaphore("scandir", 1);
-    mfile_sem = create_named_semaphore("mfile", 1);
+    scandir_sem = create_named_semaphore("scandir", SEM_CREATE_UNLOCKED);
+    mfile_sem = create_named_semaphore("mfile", SEM_CREATE_UNLOCKED);
     menu_add("Debug", fileman_menu, COUNT(fileman_menu));
     op_mode = FILE_OP_NONE;
     mfile_root = malloc(sizeof(FILES_LIST));

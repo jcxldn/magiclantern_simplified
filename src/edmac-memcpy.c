@@ -69,8 +69,8 @@ static struct LockEntry * resLock = 0;
 
 static void edmac_memcpy_init()
 {
-    edmac_memcpy_sem = create_named_semaphore("edmac_memcpy_sem", 1);
-    edmac_read_done_sem = create_named_semaphore("edmac_read_done_sem", 0);
+    edmac_memcpy_sem = create_named_semaphore("edmac_memcpy_sem", SEM_CREATE_UNLOCKED);
+    edmac_read_done_sem = create_named_semaphore("edmac_read_done_sem", SEM_CREATE_LOCKED);
     
     /* lookup the edmac channel indices for reslock */
     int read_edmac_index = edmac_channel_to_index(edmac_read_chan);

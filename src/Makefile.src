@@ -127,6 +127,7 @@ ML_SRC_OBJS = \
 	cpu.o \
 	mmu_utils.o \
 	patch_mmu.o \
+	patch_cache.o \
 	$(ML_BOOT_OBJ) \
 	$(ML_INIT_OBJ) \
 	fio-ml.o \

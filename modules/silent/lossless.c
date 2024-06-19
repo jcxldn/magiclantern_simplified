@@ -184,7 +184,7 @@ int lossless_init()
         TTL_Finish      = (void *) 0xFF4384E4;  /* called next; calls UnlockEngineResources and returns output size from JpCoreCompleteCBR */
     }
 
-    lossless_sem = create_named_semaphore(0, 0);
+    lossless_sem = create_named_semaphore(NULL, SEM_CREATE_LOCKED);
     
     if (is_camera("700D", "*") || is_camera("650D", "*") || is_camera("EOSM", "*") || is_camera("100D", "*"))
     {
@@ -539,7 +539,7 @@ static void decompress_init()
     /* all functions known? having the semaphore is an indicator we can decompress */
     if (Setup_DecodeLosslessRawPath && Start_DecodeLosslessPath && Cleanup_DecodeLosslessPath)
     {
-        decompress_sem = create_named_semaphore("decompress_sem", 0);
+        decompress_sem = create_named_semaphore("decompress_sem", SEM_CREATE_LOCKED);
     }
 }
 

@@ -1329,8 +1329,8 @@ static struct menu_entry focus_menu[] = {
 static void
 focus_init( void* unused )
 {
-    //~ focus_stack_sem = create_named_semaphore( "focus_stack_sem", 0 );
-    focus_task_sem = create_named_semaphore( "focus_task_sem", 1 );
+    //~ focus_stack_sem = create_named_semaphore("focus_stack_sem", SEM_CREATE_LOCKED);
+    focus_task_sem = create_named_semaphore("focus_task_sem", SEM_CREATE_UNLOCKED);
 
     #ifdef FEATURE_TRAP_FOCUS
     menu_add( "Focus", trap_focus_menu, COUNT(trap_focus_menu) );

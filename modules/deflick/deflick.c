@@ -248,7 +248,7 @@ static struct menu_entry post_deflicker_menu[] = {
 
 static unsigned int post_deflicker_init()
 {
-    deflicker_sem = create_named_semaphore("deflicker_sem", 1);
+    deflicker_sem = create_named_semaphore("deflicker_sem", SEM_CREATE_UNLOCKED);
     menu_add("Shoot", post_deflicker_menu, COUNT(post_deflicker_menu));
     return 0;
 }

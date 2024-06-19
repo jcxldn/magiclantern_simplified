@@ -791,7 +791,7 @@ static void load_script(struct lua_script * script)
     if (!script->sem)
     {
         /* create semaphore on first run */
-        script->sem = create_named_semaphore(script->filename, 0);
+        script->sem = create_named_semaphore(script->filename, SEM_CREATE_LOCKED);
         ASSERT(script->sem);
     }
 

@@ -5,6 +5,9 @@
 // This camera has a DIGIC VIII chip
 #define CONFIG_DIGIC_VIII
 
+// has inter-core RPC (so far this has always been dependent on SGI, 0xc)
+#define CONFIG_RPC
+
 #define CONFIG_MMU
 
 // Digic 8 does not have bitmap font in ROM, try to load it from card
@@ -24,6 +27,7 @@
 // CACHEABLE / UNCACHEABLE changes
 #define CONFIG_MEM_2GB
 
-#define CONFIG_NEW_TASK_STRUCTS
+#define CONFIG_MALLOC_STRUCT_V2
+
 #define CONFIG_TASK_STRUCT_V2_SMP
 #define CONFIG_TASK_ATTR_STRUCT_V5

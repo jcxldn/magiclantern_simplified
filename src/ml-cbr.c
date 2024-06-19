@@ -19,7 +19,7 @@
 #endif
 
 #define SEMAPHORE struct semaphore
-#define SEMAPHORE_INIT(sem) do { sem = create_named_semaphore(#sem"_sem", 1); } while(0)
+#define SEMAPHORE_INIT(sem) do { sem = create_named_semaphore(#sem"_sem", SEM_CREATE_UNLOCKED); } while(0)
 #define LOCK(x)   do { ASSERT(x); take_semaphore((x), 0); } while(0)
 #define UNLOCK(x) do { give_semaphore((x)); } while(0)
 

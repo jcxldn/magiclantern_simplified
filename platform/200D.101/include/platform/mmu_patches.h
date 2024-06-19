@@ -8,24 +8,24 @@ static const unsigned char engage_str[] = "Engage!";
 
 #if CONFIG_FW_VERSION == 101 // ensure our hard-coded patch addresses are not broken
                              // by a FW upgrade
-struct region_patch mmu_data_patches[] =
+struct patch mmu_data_patches[] =
 {
 /*
     {
         // replace "Dust Delete Data" with "Earl Grey, hot",
         // as a low risk (non-code) test that MMU remapping works.
-        .patch_addr = 0xf00d84e7,
-        .orig_content = NULL,
-        .patch_content = earl_grey_str,
+        .addr = 0xf00d84e7,
+        .old_values = (uint8_t *)0xf00d84e7,
+        .new_values = earl_grey_str,
         .size = sizeof(earl_grey_str),
         .description = "Tea"
     },
     {
         // replace "High ISO speed NR" with "Engage!",
         // as a low risk (non-code) test that MMU remapping works.
-        .patch_addr = 0xf0048842,
-        .orig_content = NULL,
-        .patch_content = engage_str,
+        .addr = 0xf0048842,
+        .old_values = (uint8_t *)0xf0048842,
+        .new_values = engage_str,
         .size = sizeof(engage_str),
         .description = "GO!"
     }

@@ -477,6 +477,15 @@ static int get_default_white_level()
 #endif
 
 #ifdef CONFIG_SX70
+    // { LIBRAW_CAMERAMAKER_Canon, "PowerShot SX70 HS", 0, 0,
+    //   { 18285,-8907,-1951,-1845,10688,1323,364,1101,5139 } },
+    #define CAM_COLORMATRIX1 \
+    18285, 10000,   -8907, 10000,  -1951, 10000, \
+    -1845, 10000,   10688, 10000,   1323, 10000, \
+      364, 10000,    1101, 10000,   5139, 10000
+#endif
+
+#ifdef CONFIG_XF605
     // copy from EOS R, as there's no data available now
     #define CAM_COLORMATRIX1 \
      8532, 10000,    -701, 10000,  -1167, 10000, \
@@ -659,6 +668,11 @@ static int dynamic_ranges[] = {1246, 1196, 1105, 1014, 927, 844, 758, 660, 566, 
 
 #ifdef CONFIG_70D
 static int dynamic_ranges[] = {1091, 1070, 1046, 986, 915, 837, 746, 655, 555};
+#endif
+
+#ifdef CONFIG_XF605
+// DxO does not list this cam, copy from R:
+static int dynamic_ranges[] = {1255, 1237, 1188, 1120, 1045, 964, 883, 785, 685, 599, 507};
 #endif
 
 static int autodetect_black_level(int* black_mean, int* black_stdev);
@@ -2751,7 +2765,7 @@ static struct menu_entry debug_menus[] = {
 
 static void raw_init()
 {
-    raw_sem = create_named_semaphore("raw_sem", 1);
+    raw_sem = create_named_semaphore("raw_sem", SEM_CREATE_UNLOCKED);
 
     #ifdef RAW_DEBUG_TYPE
     menu_add("Debug", debug_menus, COUNT(debug_menus));

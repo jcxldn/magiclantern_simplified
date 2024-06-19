@@ -1445,7 +1445,7 @@ void * bmp_lock = 0;
 
 static void bmp_init(void* unused)
 {
-    bmp_lock = CreateRecursiveLock(0);
+    bmp_lock = CreateRecursiveLock(NULL);
     ASSERT(bmp_lock)
     bvram_mirror_init();
 #ifdef FEATURE_VRAM_RGBA

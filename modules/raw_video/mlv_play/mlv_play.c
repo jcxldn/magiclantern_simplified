@@ -2871,7 +2871,7 @@ static unsigned int mlv_play_init()
     fileman_register_type("RAW", "RAW Video", mlv_play_filehandler);
     fileman_register_type("MLV", "MLV Video", mlv_play_filehandler);
     
-    mlv_play_sem = create_named_semaphore("mlv_play_running", 1);
+    mlv_play_sem = create_named_semaphore("mlv_play_running", SEM_CREATE_UNLOCKED);
     
     return 0;
 }
